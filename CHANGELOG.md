@@ -2,21 +2,21 @@
 
 ## Unreleased
 
-- **The tool remembers what you ticked and where your source is, and sets in bold whatever
+- **The tool remembers what you ticked and where your source is, and marks whatever
   was not there last time.** Every opening used to start from nothing: load, find your
   assemblies in the list again, tick them again, untick the same two classes again, paste
   the folder again. Now the first **Load Assemblies** of an environment puts all of that
   back, and anything on either list that was not on it the last time you had that
-  environment open is set in bold - a colleague's new assembly, a class somebody registered
-  since - with the count on the status line and the reason in the row's tooltip.
+  environment open wears a small green mark - a colleague's new assembly, a class somebody
+  registered since - with the count on the status line and the reason in the row's tooltip.
 
-  ![A new assembly, set in bold, and counted](assets/changelog-new-marks.png)
+  ![A new assembly, marked and counted](assets/changelog-new-marks.png)
 
   The memory is per environment, so two orgs do not trade ticks, and it is written as you go
   rather than when the tab closes. Only the first load of an environment restores; pressing
   **Load Assemblies** again in the same session still starts over, and **Refresh** still
   keeps what you have. A class counts as new only against an assembly whose classes you had
-  looked at before: ticking one for the first time does not set the whole group in bold.
+  looked at before: ticking one for the first time does not mark the whole group.
 
 ## 1.2.0
 

@@ -351,7 +351,7 @@ checked.
 | `error-under-latency` | A timeout is readable after the dialog is gone, and is not remembered as an answer. |
 | `load-fails` | A load that times out gives Load and Refresh back. The flag that holds them down for the duration has to come up on the failure path too, or one timeout bricks the tab. |
 | `write-fails` | A write that throws — the source folder taken away underneath it — releases the folder and notices it is gone. |
-| `memory` | The tool is closed and opened again on the same environment, twice, with a class and an assembly registered in between. The second opening starts with the ticks, the unticked class and the folder of the first, and sets the two newcomers in bold; the third has nothing to set in bold. |
+| `memory` | The tool is closed and opened again on the same environment, twice, with a class and an assembly registered in between. The second opening starts with the ticks, the unticked class and the folder of the first, and marks the two newcomers; the third has nothing to mark. |
 
 The first eight failed against the code that prompted them, which is why they exist. The next
 two never did: they pin two paths where a flag not cleared means a button dead for the rest of

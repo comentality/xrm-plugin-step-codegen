@@ -114,8 +114,11 @@ namespace PluginStepCodegen
 
         /// <summary>Kept in fields because a control does not own the font it is handed.</summary>
         private readonly Font _listFont = new Font("Segoe UI", 9f);
-        /// <summary>The unread mark: a row that was not on the list last time is set in this.</summary>
-        private readonly Font _listBoldFont = new Font("Segoe UI", 9f, FontStyle.Bold);
+        /// <summary>
+        /// The mark after the name of a row that was not on the list last time. Drawn rather
+        /// than shipped, so it is the list's own colour at the list's own size.
+        /// </summary>
+        private Bitmap _newMark;
         private readonly Font _codeFont = new Font("Consolas", 9f);
         /// <summary>A size up from the toolbar's own, so the dagger reads as a mark rather than a speck.</summary>
         private readonly Font _daggerFont = new Font("Segoe UI", 11f);
@@ -362,10 +365,17 @@ namespace PluginStepCodegen
             leftToolbar.Controls.Add(_chkAllAssemblies, 0, 2);
             leftToolbar.Controls.Add(_lblStatus, 1, 2);
 
+            // The mark for a row that was not there last time, on both lists. Sized to the row,
+            // so it scales with the font rather than sitting as a 16px speck on a large display.
+            // Seven tenths of the line: a badge beside the name rather than a letter of it.
+            _newMark = DrawNewMark((int)Math.Round(_listFont.Height * 0.7), GlyphGreen);
+
             // Checked, not selected: a project that ships one assembly per plugin needs all of them
             // documented in one pass, so the list is a set rather than a pointer at one row.
-            _lvAssemblies = new ListView
+            _lvAssemblies = new MarkedListView
             {
+                Mark = _newMark,
+                IsMarked = item => _newAssemblies.Contains(((AssemblyInfo)item.Tag).Id),
                 Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
@@ -414,8 +424,10 @@ namespace PluginStepCodegen
             _leftSplit.Panel1.Controls.Add(_lvAssemblies);
             _leftSplit.Panel1.Controls.Add(leftToolbar);
 
-            _lvTypes = new ListView
+            _lvTypes = new MarkedListView
             {
+                Mark = _newMark,
+                IsMarked = item => _newTypes.Contains(((PluginTypeInfo)item.Tag).Id),
                 Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
@@ -764,8 +776,8 @@ namespace PluginStepCodegen
             if (disposing)
             {
                 _listFont.Dispose();
-                _listBoldFont.Dispose();
                 _codeFont.Dispose();
+                if (_newMark != null) _newMark.Dispose();
                 _daggerFont.Dispose();
                 // A ContextMenuStrip belongs to no Controls collection, so nothing else frees it.
                 if (_experimentalMenu != null) _experimentalMenu.Dispose();
@@ -1120,14 +1132,35 @@ namespace PluginStepCodegen
             }
         }
 
-        /// <summary>The unread mark, on every cell: the lists style their cells one by one.</summary>
-        private void MarkNew(ListViewItem item)
+        /// <summary>
+        /// The mark after the name of a row that was not there last time: three short lines fanning up and to the right from a point low on
+        /// the left, the way a "new" badge bursts. Lines rather than a filled star so it reads
+        /// as a mark on the row rather than as an icon the row is about.
+        /// </summary>
+        private static Bitmap DrawNewMark(int size, Color color)
         {
-            item.Font = _listBoldFont;
-            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
+            var bitmap = new Bitmap(size, size);
+            using (var g = Graphics.FromImage(bitmap))
+            using (var pen = new Pen(color, Math.Max(1.2f, size / 8f)))
             {
-                cell.Font = _listBoldFont;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                pen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+
+                // Fanning from the bottom-left corner to fill the box, so the mark is as tall
+                // as the letters it follows rather than a speck in the middle of its cell.
+                float cx = size * 0.1f, cy = size * 0.9f;
+                float inner = size * 0.3f, outer = size * 0.88f;
+                foreach (var degrees in new[] { -70, -40, -10 })
+                {
+                    var a = degrees * Math.PI / 180;
+                    g.DrawLine(pen,
+                        (float)(cx + inner * Math.Cos(a)), (float)(cy + inner * Math.Sin(a)),
+                        (float)(cx + outer * Math.Cos(a)), (float)(cy + outer * Math.Sin(a)));
+                }
             }
+
+            return bitmap;
         }
 
         private const string NewNote = "New since you last had this environment open.";
@@ -1239,11 +1272,6 @@ namespace PluginStepCodegen
                     UseItemStyleForSubItems = false
                 };
                 item.SubItems.Add(string.Empty);
-                if (_newAssemblies.Contains(assembly.Id))
-                {
-                    MarkNew(item);
-                }
-
                 _lvAssemblies.Items.Add(item);
             }
 
@@ -1511,11 +1539,6 @@ namespace PluginStepCodegen
                     };
                     item.SubItems.Add(type.Steps.Count.ToString());
                     item.SubItems.Add(string.Empty);
-                    if (_newTypes.Contains(type.Id))
-                    {
-                        MarkNew(item);
-                    }
-
                     _lvTypes.Items.Add(item);
                 }
             }
@@ -1632,7 +1655,7 @@ namespace PluginStepCodegen
                 return;
             }
 
-            // Counted among the rows on screen, so the number is always the number of bold rows
+            // Counted among the rows on screen, so the number is always the number of marked rows
             // a scroll would find. A new row behind a switch is counted once the switch is on.
             var fresh = _lvAssemblies.Items.Cast<ListViewItem>().Count(i => _newAssemblies.Contains(((AssemblyInfo)i.Tag).Id));
 

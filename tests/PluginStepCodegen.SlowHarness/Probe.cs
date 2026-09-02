@@ -132,10 +132,16 @@ namespace PluginStepCodegen.SlowHarness
             row.Checked = ticked;
         }
 
-        /// <summary>Whether a row wears the unread mark. A missing row does not.</summary>
-        public static bool IsBold(ListViewItem row)
+        /// <summary>
+        /// Whether a row wears the "new since last time" mark. Asked of the list that paints
+        /// it, since the mark is painted after the name rather than kept on the row. A missing
+        /// row does not.
+        /// </summary>
+        public static bool IsNew(ListViewItem row)
         {
-            return row != null && row.Font.Bold;
+            if (row == null) return false;
+            var list = row.ListView as MarkedListView;
+            return list != null && list.IsMarked != null && list.IsMarked(row);
         }
 
         /// <summary>The id behind a named assembly row, for reading the fetch cache against it.</summary>

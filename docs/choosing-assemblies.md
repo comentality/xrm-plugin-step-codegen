@@ -103,7 +103,8 @@ over, as it always has, and **Refresh** keeps whatever you have. The memory is w
 you go rather than when the tab closes, so a crash costs nothing.
 
 Anything on either list that was not there the last time you had the environment open is
-**set in bold**, with the reason in the row's tooltip and a count on the status line:
+**marked with a small green sparkle** after its name, with the reason in the row's tooltip
+and a count on the status line:
 
 ```
 3 assemblies · 6 of 6 classes · 1 new
@@ -112,7 +113,7 @@ Anything on either list that was not there the last time you had the environment
 For assemblies that means any row the environment lists now and did not list then. For
 classes it means one you had not seen, in an assembly whose classes you had looked at
 before — or in an assembly that is itself new. Ticking an assembly for the first time does
-not set its whole group in bold; every class in it is unseen, and marking them all would say
+not mark its whole group; every class in it is unseen, and marking them all would say
 nothing.
 
 The count is of rows on screen, so it always matches what a scroll would find. A new

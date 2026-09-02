@@ -125,14 +125,14 @@ namespace PluginStepCodegen.SlowHarness
                     var ticked = r.Probe.ClassRow("AccountPreValidation");
                     r.Check(ticked != null && ticked.Checked, "AccountPreValidation should still be ticked");
 
-                    r.Check(Probe.IsBold(r.Probe.Row(Late)), Late + " was not there last time and should be bold");
-                    r.Check(!Probe.IsBold(contoso), Contoso + " was there last time and should not be bold");
-                    r.Check(Probe.IsBold(r.Probe.ClassRow("LateArrival")), "LateArrival was not there last time and should be bold");
-                    r.Check(!Probe.IsBold(ticked), "AccountPreValidation was there last time and should not be bold");
+                    r.Check(Probe.IsNew(r.Probe.Row(Late)), Late + " was not there last time and should be marked new");
+                    r.Check(!Probe.IsNew(contoso), Contoso + " was there last time and should not be marked new");
+                    r.Check(Probe.IsNew(r.Probe.ClassRow("LateArrival")), "LateArrival was not there last time and should be marked new");
+                    r.Check(!Probe.IsNew(ticked), "AccountPreValidation was there last time and should not be marked new");
 
                     var lateRow = r.Probe.Row(Late);
                     r.Check(lateRow != null && lateRow.ToolTipText.Contains("New since"),
-                        "the new assembly's tooltip should say why it is bold");
+                        "the new assembly's tooltip should say why it is marked");
                     r.Check(r.Probe.Status.Contains("1 new"),
                         "the status line should count the new assembly, and reads \"" + r.Probe.Status + "\"");
                 })
@@ -142,10 +142,10 @@ namespace PluginStepCodegen.SlowHarness
                 {
                     var contoso = r.Probe.Row(Contoso);
                     r.Check(contoso != null && contoso.Checked, Contoso + " should be ticked a third time");
-                    r.Check(r.Probe.Assemblies.Items.Cast<ListViewItem>().All(i => !Probe.IsBold(i)),
-                        "everything on the assembly list was there last time; none of it should be bold");
-                    r.Check(r.Probe.Classes.Items.Cast<ListViewItem>().All(i => !Probe.IsBold(i)),
-                        "everything on the class list was there last time; none of it should be bold");
+                    r.Check(r.Probe.Assemblies.Items.Cast<ListViewItem>().All(i => !Probe.IsNew(i)),
+                        "everything on the assembly list was there last time; none of it should be marked new");
+                    r.Check(r.Probe.Classes.Items.Cast<ListViewItem>().All(i => !Probe.IsNew(i)),
+                        "everything on the class list was there last time; none of it should be marked new");
                     r.Check(!r.Probe.Status.Contains("new"),
                         "the status line should count nothing new, and reads \"" + r.Probe.Status + "\"");
                 });
