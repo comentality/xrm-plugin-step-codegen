@@ -52,7 +52,103 @@ namespace PluginStepCodegen.SlowHarness
                 ErrorUnderLatency(),
                 LoadFails(),
                 WriteFails(),
+                Memory(),
             };
+        }
+
+        /// <summary>
+        /// The tool is used, closed, and opened again on the same environment - twice. In
+        /// between, somebody registers a class and an assembly from the IDE.
+        ///
+        /// Not a slow-link question, but the same bench answers it: the memory is written on the
+        /// way and read back on the next load, both of which land in async callbacks, and the
+        /// second opening is a fresh control against the same fake environment. What is asked is
+        /// what the next opening starts with, and whether it can tell what was not there before.
+        /// </summary>
+        private static Scenario Memory()
+        {
+            const string Environment = "slow-harness-memory";
+            const string Late = "Contoso.Late.Plugins";
+
+            return new Scenario
+            {
+                Name = "memory",
+                Why = "the next opening must start where this one left off, and say what is new",
+                Wire = s => s.Latency = Slow("plugintype", 300)
+            }
+                .At(0, "connect and point at the folder", r =>
+                {
+                    r.Connect(Environment);
+                    r.Probe.TypeFolder(r.Folder);
+                })
+                .At(100, "press Load", r => r.Probe.PressLoad())
+                .At(600, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
+                .At(2000, "untick AccountNumberGenerator", r =>
+                {
+                    r.Check(r.Probe.ClassRow("AccountNumberGenerator") != null,
+                        "the class list should have Contoso's classes by now");
+                    r.Probe.TickClass("AccountNumberGenerator", false);
+                })
+                .At(2500, "close the tab", r =>
+                {
+                    r.Form.Controls.Remove(r.Control);
+                    r.Control.Dispose();
+                })
+                .At(2600, "register a class and an assembly from the IDE", r =>
+                {
+                    var contoso = r.Service.Assemblies.First(a => a.Name == Contoso);
+                    r.Service.Types[contoso.Id].Add(Sample.NewType(contoso,
+                        "Contoso.Plugins.Accounts.LateArrival",
+                        Sample.NewStep("Create", "account", 40, 0)));
+
+                    var late = Sample.NewAssembly(Late, "a1b2c3d4e5f60718", 2);
+                    r.Service.Assemblies.Add(late);
+                    r.Service.Types[late.Id] = new List<PluginTypeInfo>
+                    {
+                        Sample.NewType(late, "Contoso.Late.Plugins.Newcomer",
+                            Sample.NewStep("Update", "contact", 40, 0))
+                    };
+                })
+                .At(2700, "open the tool again", r => r.Reopen(Environment))
+                .At(2800, "press Load", r => r.Probe.PressLoad())
+                .At(5000, "read what came back", r =>
+                {
+                    var contoso = r.Probe.Row(Contoso);
+                    r.Check(contoso != null && contoso.Checked, Contoso + " should be ticked again");
+                    var integration = r.Probe.Row(Integration);
+                    r.Check(integration != null && !integration.Checked, Integration + " should not be");
+                    r.Check(string.Equals(r.Probe.Folder.Text, r.Folder, StringComparison.OrdinalIgnoreCase),
+                        "the folder should be back in the box, and is \"" + r.Probe.Folder.Text + "\"");
+
+                    var unticked = r.Probe.ClassRow("AccountNumberGenerator");
+                    r.Check(unticked != null && !unticked.Checked, "AccountNumberGenerator should still be unticked");
+                    var ticked = r.Probe.ClassRow("AccountPreValidation");
+                    r.Check(ticked != null && ticked.Checked, "AccountPreValidation should still be ticked");
+
+                    r.Check(Probe.IsBold(r.Probe.Row(Late)), Late + " was not there last time and should be bold");
+                    r.Check(!Probe.IsBold(contoso), Contoso + " was there last time and should not be bold");
+                    r.Check(Probe.IsBold(r.Probe.ClassRow("LateArrival")), "LateArrival was not there last time and should be bold");
+                    r.Check(!Probe.IsBold(ticked), "AccountPreValidation was there last time and should not be bold");
+
+                    var lateRow = r.Probe.Row(Late);
+                    r.Check(lateRow != null && lateRow.ToolTipText.Contains("New since"),
+                        "the new assembly's tooltip should say why it is bold");
+                    r.Check(r.Probe.Status.Contains("1 new"),
+                        "the status line should count the new assembly, and reads \"" + r.Probe.Status + "\"");
+                })
+                .At(5200, "close and open once more", r => r.Reopen(Environment))
+                .At(5300, "press Load", r => r.Probe.PressLoad())
+                .At(7500, "nothing is new now", r =>
+                {
+                    var contoso = r.Probe.Row(Contoso);
+                    r.Check(contoso != null && contoso.Checked, Contoso + " should be ticked a third time");
+                    r.Check(r.Probe.Assemblies.Items.Cast<ListViewItem>().All(i => !Probe.IsBold(i)),
+                        "everything on the assembly list was there last time; none of it should be bold");
+                    r.Check(r.Probe.Classes.Items.Cast<ListViewItem>().All(i => !Probe.IsBold(i)),
+                        "everything on the class list was there last time; none of it should be bold");
+                    r.Check(!r.Probe.Status.Contains("new"),
+                        "the status line should count nothing new, and reads \"" + r.Probe.Status + "\"");
+                });
         }
 
         /// <summary>

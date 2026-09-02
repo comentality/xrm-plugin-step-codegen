@@ -118,6 +118,26 @@ namespace PluginStepCodegen.SlowHarness
                 .FirstOrDefault(i => string.Equals(i.Text, assemblyName, StringComparison.Ordinal));
         }
 
+        public ListViewItem ClassRow(string className)
+        {
+            return Classes.Items.Cast<ListViewItem>()
+                .FirstOrDefault(i => string.Equals(i.Text, className, StringComparison.Ordinal));
+        }
+
+        /// <summary>Ticks or unticks the named class's row, exactly as a click on its checkbox would.</summary>
+        public void TickClass(string className, bool ticked = true)
+        {
+            var row = ClassRow(className);
+            if (row == null) throw new InvalidOperationException("No row named " + className + " in the class list.");
+            row.Checked = ticked;
+        }
+
+        /// <summary>Whether a row wears the unread mark. A missing row does not.</summary>
+        public static bool IsBold(ListViewItem row)
+        {
+            return row != null && row.Font.Bold;
+        }
+
         /// <summary>The id behind a named assembly row, for reading the fetch cache against it.</summary>
         public Guid IdOf(string assemblyName)
         {

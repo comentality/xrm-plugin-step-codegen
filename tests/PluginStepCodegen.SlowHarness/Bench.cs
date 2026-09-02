@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using ThreadExceptionEventHandler = System.Threading.ThreadExceptionEventHandler;
+using McTools.Xrm.Connection;
 using PluginStepCodegen.Harness;
 
 namespace PluginStepCodegen.SlowHarness
@@ -45,6 +46,36 @@ namespace PluginStepCodegen.SlowHarness
         public void Check(bool ok, string what)
         {
             if (!ok) Failures.Add(Clock.ElapsedMilliseconds + "ms  " + what);
+        }
+
+        /// <summary>
+        /// Tells the control which environment it is connected to, the way XrmToolBox does when
+        /// a connection is picked. The service is already wired; this is the name the tool files
+        /// its memory of the environment under, and without it nothing is remembered at all.
+        /// </summary>
+        public void Connect(string environment)
+        {
+            Control.ConnectionDetail = new ConnectionDetail
+            {
+                ConnectionName = environment,
+                EnvironmentId = environment
+            };
+        }
+
+        /// <summary>
+        /// Closes the tab and opens the tool again: a new control, on the same environment and
+        /// in the same window. What the tool carries across is exactly what it wrote down.
+        /// </summary>
+        public void Reopen(string environment)
+        {
+            Form.Controls.Remove(Control);
+            if (!Control.IsDisposed) Control.Dispose();
+
+            Control = new PluginStepCodegenControl { Dock = DockStyle.Fill };
+            Scenario.Connect(Control, Service);
+            Probe = new Probe(Control);
+            Form.Controls.Add(Control);
+            Connect(environment);
         }
     }
 
@@ -174,7 +205,7 @@ namespace PluginStepCodegen.SlowHarness
         /// because outside a host nothing has any business setting one - so a harness that is
         /// standing in for the host reaches it the way it reaches everything else here.
         /// </summary>
-        private static void Connect(PluginStepCodegenControl control, Microsoft.Xrm.Sdk.IOrganizationService service)
+        internal static void Connect(PluginStepCodegenControl control, Microsoft.Xrm.Sdk.IOrganizationService service)
         {
             const BindingFlags any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
                                      | BindingFlags.DeclaredOnly;

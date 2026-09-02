@@ -57,6 +57,16 @@ namespace PluginStepCodegen.SlowHarness
 
             Directory.CreateDirectory(root);
 
+            // The tool files what it remembers of an environment through XrmToolBox's settings
+            // manager, whose folder is the real XrmToolBox's whichever process asks. Pointed at
+            // a folder of its own here, and a fresh one per run, so a scenario about memory
+            // neither reads the user's nor leaves anything in it.
+            var home = Path.Combine(root, "xtb-home");
+            if (Directory.Exists(home)) Directory.Delete(home, true);
+            // It has to be there before it is pointed at; the override checks.
+            Directory.CreateDirectory(home);
+            XrmToolBox.Extensibility.Paths.OverrideRootPath(home);
+
             var failed = 0;
             var report = new List<string>();
             foreach (var scenario in scenarios)

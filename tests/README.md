@@ -351,15 +351,23 @@ checked.
 | `error-under-latency` | A timeout is readable after the dialog is gone, and is not remembered as an answer. |
 | `load-fails` | A load that times out gives Load and Refresh back. The flag that holds them down for the duration has to come up on the failure path too, or one timeout bricks the tab. |
 | `write-fails` | A write that throws — the source folder taken away underneath it — releases the folder and notices it is gone. |
+| `memory` | The tool is closed and opened again on the same environment, twice, with a class and an assembly registered in between. The second opening starts with the ticks, the unticked class and the folder of the first, and sets the two newcomers in bold; the third has nothing to set in bold. |
 
-The first eight failed against the code that prompted them, which is why they exist. The last
+The first eight failed against the code that prompted them, which is why they exist. The next
 two never did: they pin two paths where a flag not cleared means a button dead for the rest of
 the session, which is the kind of thing that is correct until somebody edits near it. Both were
 checked by breaking them on purpose and watching the scenario go red — worth doing to any
 scenario written against code that already passes, because one that cannot fail is worse than
-one that is not there. The exit code
-is the number of scenarios with findings, and `report.txt` beside the shots holds the same
-lines the console printed.
+one that is not there. `memory` is not a slow-link question at all; it is here because the
+memory is written and read back inside the same async callbacks the rest of the suite watches,
+and because this bench is the one that can open the tool twice. It was checked the same way.
+The exit code is the number of scenarios with findings, and `report.txt` beside the shots holds
+the same lines the console printed.
+
+The memory goes through XrmToolBox's settings manager, whose folder is the real XrmToolBox's
+whichever process asks, so the harness points it at `tests\.slow\xtb-home` — wiped on every
+run — before the first scenario opens. Nothing here reads the user's settings or leaves
+anything in them.
 
 ## Windows nobody has to look at
 
