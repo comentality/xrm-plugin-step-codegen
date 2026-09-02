@@ -149,6 +149,12 @@ namespace PluginStepCodegen
         /// </summary>
         private Timer _previewSettled;
 
+        /// <summary>
+        /// A class untick is one XML write; selecting the whole list and pressing space is one
+        /// per row. This waits for the run to end so the memory is written once.
+        /// </summary>
+        private Timer _memorySettled;
+
         private TableLayoutPanel _toolbar;
         private TextBox _txtFolder;
         private Button _btnBrowse;
@@ -396,6 +402,13 @@ namespace PluginStepCodegen
             {
                 _previewSettled.Stop();
                 RenderPreview();
+            };
+
+            _memorySettled = new Timer { Interval = 120 };
+            _memorySettled.Tick += (s, e) =>
+            {
+                _memorySettled.Stop();
+                SaveMemory();
             };
 
             _leftSplit.Panel1.Controls.Add(_lvAssemblies);
@@ -738,6 +751,7 @@ namespace PluginStepCodegen
             {
                 if (_checkSettled != null) _checkSettled.Dispose();
                 if (_previewSettled != null) _previewSettled.Dispose();
+                if (_memorySettled != null) _memorySettled.Dispose();
                 if (_scanSettled != null) _scanSettled.Dispose();
                 // A scan in flight checks the generation on arrival; bumping it here is what
                 // turns "the control is going away" into "that result is nobody's".
@@ -1531,7 +1545,9 @@ namespace PluginStepCodegen
             }
 
             UpdateButtonState();
-            SaveMemory();
+
+            _memorySettled.Stop();
+            _memorySettled.Start();
         }
 
         private void UpdateButtonState()
@@ -1617,7 +1633,7 @@ namespace PluginStepCodegen
             }
 
             // Counted among the rows on screen, so the number is always the number of bold rows
-            // a scroll would find; a new row behind a switch is in the "out of view" arithmetic.
+            // a scroll would find. A new row behind a switch is counted once the switch is on.
             var fresh = _lvAssemblies.Items.Cast<ListViewItem>().Count(i => _newAssemblies.Contains(((AssemblyInfo)i.Tag).Id));
 
             if (chosen == 0)

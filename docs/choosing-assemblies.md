@@ -116,8 +116,8 @@ not set its whole group in bold; every class in it is unseen, and marking them a
 nothing.
 
 The count is of rows on screen, so it always matches what a scroll would find. A new
-assembly behind the **Managed** switch is in the "out of view" arithmetic instead. The marks
-stay for the session, and are gone the next time you open the environment.
+assembly behind the **Managed** switch is counted once the switch is on, and not before.
+The marks stay for the session, and are gone the next time you open the environment.
 
 One file per environment, beside the tool's other settings in XrmToolBox's settings folder,
 named `PluginStepCodegen_memory-<environment>.xml`. Delete it to forget an environment.
