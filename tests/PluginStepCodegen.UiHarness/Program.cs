@@ -164,6 +164,17 @@ namespace PluginStepCodegen.UiHarness
                 Field<RadioButton>(control, "_rbComment").Checked = true;
             }
 
+            // The unread marks, for the one shot that is about them: an assembly and a class the
+            // control would have judged new against the environment's memory. The judgement is
+            // skipped, not faked - the harness has no connection, so it has no memory to judge
+            // against - and the sets it would have filled are filled by hand.
+            if (Environment.GetEnvironmentVariable("UIHARNESS_NEW") == "1")
+            {
+                Field<HashSet<Guid>>(control, "_newAssemblies").Add(assemblies[1].Id);
+                var fresh = typesByAssembly[assemblies[0].Id];
+                Field<HashSet<Guid>>(control, "_newTypes").Add(fresh[fresh.Count - 1].Id);
+            }
+
             Invoke(control, "RenderAssemblies");
             Invoke(control, "RenderTypes");
 

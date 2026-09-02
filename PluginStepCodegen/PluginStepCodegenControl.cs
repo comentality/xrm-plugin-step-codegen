@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Xrm.Sdk;
+using McTools.Xrm.Connection;
 using PluginStepCodegen.Logic;
 using XrmToolBox.Extensibility;
 using Label = System.Windows.Forms.Label;
@@ -113,6 +114,8 @@ namespace PluginStepCodegen
 
         /// <summary>Kept in fields because a control does not own the font it is handed.</summary>
         private readonly Font _listFont = new Font("Segoe UI", 9f);
+        /// <summary>The unread mark: a row that was not on the list last time is set in this.</summary>
+        private readonly Font _listBoldFont = new Font("Segoe UI", 9f, FontStyle.Bold);
         private readonly Font _codeFont = new Font("Consolas", 9f);
         /// <summary>A size up from the toolbar's own, so the dagger reads as a mark rather than a speck.</summary>
         private readonly Font _daggerFont = new Font("Segoe UI", 11f);
@@ -178,6 +181,30 @@ namespace PluginStepCodegen
         /// per pane would splice every matched file twice more for the same answer.
         /// </summary>
         private readonly HashSet<Guid> _staleTypes = new HashSet<Guid>();
+
+        /// <summary>
+        /// Which environment's memory the tool is keeping, or null while it is keeping none -
+        /// before the first load, and in a harness that has no connection. Taken once, when the
+        /// assemblies are loaded, and saved under from then on: a connection switched under a
+        /// list that was never reloaded must not file that list's ids under the new environment.
+        /// </summary>
+        private string _memoryKey;
+
+        /// <summary>
+        /// What the environment's memory said when it was read, and never touched afterwards.
+        /// Every "new" is judged against this. Judging against the file would unmark everything
+        /// at the first save, since a save writes today's list down as seen.
+        /// </summary>
+        private HashSet<Guid> _rememberedAssemblies;
+        private HashSet<Guid> _rememberedFetched;
+        private HashSet<Guid> _rememberedTypes;
+
+        /// <summary>
+        /// The rows that were not there the last time this environment was open. Kept for the
+        /// whole session, because a mark that went away on the first tick would never be read.
+        /// </summary>
+        private readonly HashSet<Guid> _newAssemblies = new HashSet<Guid>();
+        private readonly HashSet<Guid> _newTypes = new HashSet<Guid>();
 
         private static readonly Color GlyphGreen = Color.FromArgb(26, 127, 55);
         private static readonly Color GlyphAmber = Color.FromArgb(154, 103, 0);
@@ -361,6 +388,7 @@ namespace PluginStepCodegen
             {
                 _checkSettled.Stop();
                 LoadCheckedTypes();
+                SaveMemory();
             };
 
             _previewSettled = new Timer { Interval = 120 };
@@ -470,6 +498,9 @@ namespace PluginStepCodegen
             {
                 _scanSettled.Stop();
                 StartScan();
+                // The folder is the third thing worth carrying to the next session, and this
+                // is the one place it settles.
+                SaveMemory();
             };
 
             // No checkboxes: nothing here is picked for an operation, it is the scan's ledger.
@@ -719,6 +750,7 @@ namespace PluginStepCodegen
             if (disposing)
             {
                 _listFont.Dispose();
+                _listBoldFont.Dispose();
                 _codeFont.Dispose();
                 _daggerFont.Dispose();
                 // A ContextMenuStrip belongs to no Controls collection, so nothing else frees it.
@@ -859,11 +891,232 @@ namespace PluginStepCodegen
                     _checkedAssemblies.Clear();
                     _excludedTypes.Clear();
                     _loaded = true;
+                    // The first load of an environment puts back what was ticked last time it
+                    // was open; a later one in the same session is "start over", as it always was.
+                    RestoreMemory();
                     RenderAssemblies();
-                    RenderTypes();
+                    // Not RenderTypes: ticks that came back from memory have their classes to fetch.
+                    LoadCheckedTypes();
                 }
             });
         }
+
+        // ===== Memory: what one opening of an environment carries to the next =====
+
+        /// <summary>
+        /// The environment, as a string safe to name a file after. The environment rather than
+        /// the connection, because two connections to one org - two users, or one user twice -
+        /// are looking at the same registrations and should share one memory of them. Null when
+        /// there is no connection to name, which is every harness, and in that case nothing is
+        /// saved anywhere: the settings folder is the real XrmToolBox's, whichever host this is.
+        /// </summary>
+        private string MemoryKey()
+        {
+            var detail = ConnectionDetail;
+            if (detail == null)
+            {
+                return null;
+            }
+
+            var raw = !string.IsNullOrWhiteSpace(detail.EnvironmentId) ? detail.EnvironmentId
+                : !string.IsNullOrWhiteSpace(detail.OrganizationUrlName) ? detail.OrganizationUrlName
+                : detail.ConnectionId.HasValue ? detail.ConnectionId.Value.ToString()
+                : null;
+            if (raw == null)
+            {
+                return null;
+            }
+
+            var safe = new StringBuilder(raw.Length);
+            foreach (var c in raw)
+            {
+                safe.Append(char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_');
+            }
+
+            return safe.ToString();
+        }
+
+        /// <summary>
+        /// The settings name the environment's memory is filed under. XrmToolBox puts it after
+        /// the tool's own name and an underscore: PluginStepCodegen_memory-{environment}.xml,
+        /// beside the PluginStepCodegen.xml the experimental switches live in.
+        /// </summary>
+        private static string MemoryName(string key)
+        {
+            return "memory-" + key;
+        }
+
+        /// <summary>
+        /// Run when a fresh assembly list has landed and the ticks have been cleared. On the
+        /// first load of an environment this reads its memory, puts the ticks and the folder
+        /// back, and takes the snapshot everything "new" is judged against; on every load it
+        /// works out which assemblies are news and writes today's list down.
+        /// </summary>
+        private void RestoreMemory()
+        {
+            var key = MemoryKey();
+            if (key == null)
+            {
+                _memoryKey = null;
+                _rememberedAssemblies = _rememberedFetched = _rememberedTypes = null;
+                _newAssemblies.Clear();
+                _newTypes.Clear();
+                return;
+            }
+
+            if (!string.Equals(key, _memoryKey, StringComparison.Ordinal))
+            {
+                _memoryKey = key;
+                _newTypes.Clear();
+
+                SessionMemory memory = null;
+                try
+                {
+                    SettingsManager.Instance.TryLoad(typeof(PluginStepCodegenControl), out memory, MemoryName(key));
+                }
+                catch (Exception)
+                {
+                    // A memory that cannot be read is a first visit, which is what an
+                    // environment with no memory gets anyway.
+                }
+
+                if (memory == null)
+                {
+                    // No file: nothing to put back, and nothing to call new against.
+                    _rememberedAssemblies = _rememberedFetched = _rememberedTypes = null;
+                }
+                else
+                {
+                    _rememberedAssemblies = new HashSet<Guid>(memory.SeenAssemblies ?? new List<Guid>());
+                    _rememberedFetched = new HashSet<Guid>(memory.FetchedAssemblies ?? new List<Guid>());
+                    _rememberedTypes = new HashSet<Guid>(memory.SeenTypes ?? new List<Guid>());
+
+                    // Only ids the environment still lists. An assembly that went away since
+                    // is not ticked back into a list it is not on.
+                    var alive = new HashSet<Guid>(_assemblies.Select(a => a.Id));
+                    foreach (var id in memory.CheckedAssemblies ?? new List<Guid>())
+                    {
+                        if (alive.Contains(id))
+                        {
+                            _checkedAssemblies.Add(id);
+                        }
+                    }
+
+                    foreach (var id in memory.ExcludedTypes ?? new List<Guid>())
+                    {
+                        _excludedTypes.Add(id);
+                    }
+
+                    // A folder already typed is this session's answer and outranks last session's.
+                    if (_txtFolder.Text.Trim().Length == 0 && !string.IsNullOrWhiteSpace(memory.Folder))
+                    {
+                        _txtFolder.Text = memory.Folder;
+                    }
+                }
+            }
+
+            MarkNewAssemblies();
+            SaveMemory();
+        }
+
+        /// <summary>
+        /// Which of the listed assemblies were not on the list last time. Against the snapshot,
+        /// so a refresh mid-session that brings in a registration made since still marks it.
+        /// </summary>
+        private void MarkNewAssemblies()
+        {
+            _newAssemblies.Clear();
+            if (_rememberedAssemblies == null)
+            {
+                return;
+            }
+
+            foreach (var assembly in _assemblies)
+            {
+                if (!_rememberedAssemblies.Contains(assembly.Id))
+                {
+                    _newAssemblies.Add(assembly.Id);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Which of a batch of classes were not seen last time. A class is only news against an
+        /// assembly whose classes were looked at before, or one that is itself news: in an
+        /// assembly that was listed and never ticked, every class is unseen and marking them all
+        /// would say nothing.
+        /// </summary>
+        private void MarkNewTypes(IEnumerable<PluginTypeInfo> types)
+        {
+            if (_rememberedTypes == null)
+            {
+                return;
+            }
+
+            foreach (var type in types)
+            {
+                if (!_rememberedTypes.Contains(type.Id)
+                    && (_rememberedFetched.Contains(type.AssemblyId) || _newAssemblies.Contains(type.AssemblyId)))
+                {
+                    _newTypes.Add(type.Id);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Writes the environment's memory: the ticks and the folder as they are, and as seen
+        /// everything listed or fetched today or remembered as such - what was fetched last
+        /// session and not ticked this one stays known, or its classes would all read as new
+        /// the next time it was ticked.
+        /// </summary>
+        private void SaveMemory()
+        {
+            if (_memoryKey == null)
+            {
+                return;
+            }
+
+            var alive = new HashSet<Guid>(_assemblies.Select(a => a.Id));
+            var fetched = new HashSet<Guid>(_typesByAssembly.Keys);
+            var types = new HashSet<Guid>(_typesByAssembly.Values.SelectMany(t => t).Select(t => t.Id));
+            if (_rememberedFetched != null)
+            {
+                fetched.UnionWith(_rememberedFetched.Where(alive.Contains));
+                types.UnionWith(_rememberedTypes);
+            }
+
+            var memory = new SessionMemory
+            {
+                Folder = _txtFolder.Text.Trim(),
+                CheckedAssemblies = _checkedAssemblies.ToList(),
+                ExcludedTypes = _excludedTypes.ToList(),
+                SeenAssemblies = alive.ToList(),
+                FetchedAssemblies = fetched.ToList(),
+                SeenTypes = types.ToList()
+            };
+
+            try
+            {
+                SettingsManager.Instance.Save(typeof(PluginStepCodegenControl), memory, MemoryName(_memoryKey));
+            }
+            catch (Exception)
+            {
+                // A memory that cannot be written costs the ticks next session, which is not
+                // worth interrupting this one over.
+            }
+        }
+
+        /// <summary>The unread mark, on every cell: the lists style their cells one by one.</summary>
+        private void MarkNew(ListViewItem item)
+        {
+            item.Font = _listBoldFont;
+            foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
+            {
+                cell.Font = _listBoldFont;
+            }
+        }
+
+        private const string NewNote = "New since you last had this environment open.";
 
         private void BtnRefresh_Click(object sender, EventArgs e)
         {
@@ -914,8 +1167,12 @@ namespace PluginStepCodegen
                     // Columns move with the registrations - refresh is pressed after changing
                     // things in the IDE, and a new column is exactly such a change.
                     _columnsByEntity.Clear();
+                    // A registration made since the tab was opened is as much news as one made
+                    // since last session, and this is the press that brings it in.
+                    MarkNewAssemblies();
                     RenderAssemblies();
                     LoadCheckedTypes();
+                    SaveMemory();
                 }
             });
         }
@@ -968,6 +1225,11 @@ namespace PluginStepCodegen
                     UseItemStyleForSubItems = false
                 };
                 item.SubItems.Add(string.Empty);
+                if (_newAssemblies.Contains(assembly.Id))
+                {
+                    MarkNew(item);
+                }
+
                 _lvAssemblies.Items.Add(item);
             }
 
@@ -1033,6 +1295,7 @@ namespace PluginStepCodegen
             _rendering = false;
 
             LoadCheckedTypes();
+            SaveMemory();
         }
 
         /// <summary>
@@ -1178,6 +1441,10 @@ namespace PluginStepCodegen
                         _typesByAssembly[id] = loaded[id].ToList();
                     }
 
+                    // Judged as they land, against the snapshot, before they are written down.
+                    MarkNewTypes(fetched.Key.Types);
+                    SaveMemory();
+
                     // And whatever was ticked while this was on its way. Ends in RenderTypes
                     // either way: with nothing left to ask for, that is all this does.
                     LoadCheckedTypes();
@@ -1230,6 +1497,11 @@ namespace PluginStepCodegen
                     };
                     item.SubItems.Add(type.Steps.Count.ToString());
                     item.SubItems.Add(string.Empty);
+                    if (_newTypes.Contains(type.Id))
+                    {
+                        MarkNew(item);
+                    }
+
                     _lvTypes.Items.Add(item);
                 }
             }
@@ -1259,6 +1531,7 @@ namespace PluginStepCodegen
             }
 
             UpdateButtonState();
+            SaveMemory();
         }
 
         private void UpdateButtonState()
@@ -1343,12 +1616,17 @@ namespace PluginStepCodegen
                 return;
             }
 
+            // Counted among the rows on screen, so the number is always the number of bold rows
+            // a scroll would find; a new row behind a switch is in the "out of view" arithmetic.
+            var fresh = _lvAssemblies.Items.Cast<ListViewItem>().Count(i => _newAssemblies.Contains(((AssemblyInfo)i.Tag).Id));
+
             if (chosen == 0)
             {
                 _lblStatus.Text =
                     _assemblies.Count == 0 ? "Load the assemblies to start." :
                     shown == 0 ? "Nothing matches." :
-                    "Tick the assemblies to document.";
+                    fresh == 0 ? "Tick the assemblies to document." :
+                    "Tick the assemblies to document · " + fresh + " new since last time";
                 return;
             }
 
@@ -1367,6 +1645,7 @@ namespace PluginStepCodegen
                 + _lvTypes.CheckedItems.Count + " of " + _lvTypes.Items.Count + " classes"
                 + (_typesInFlight.Count == 0 ? string.Empty : " · " + _typesInFlight.Count + " still loading")
                 + (hidden == 0 ? string.Empty : " · " + hidden + " out of view")
+                + (fresh == 0 ? string.Empty : " · " + fresh + " new")
                 + (empty == 0 ? string.Empty : " · " + empty + " with no steps");
         }
 
@@ -1637,7 +1916,8 @@ namespace PluginStepCodegen
                 var cell = item.SubItems[2];
                 cell.Text = glyph.Length == 0 ? string.Empty : glyph + " " + words;
                 cell.ForeColor = color;
-                item.ToolTipText = detail == null ? type.TypeName : type.TypeName + "\r\n" + detail;
+                item.ToolTipText = (detail == null ? type.TypeName : type.TypeName + "\r\n" + detail)
+                    + (_newTypes.Contains(type.Id) ? "\r\n" + NewNote : string.Empty);
             }
 
             _lvTypes.EndUpdate();
@@ -1797,11 +2077,11 @@ namespace PluginStepCodegen
         /// for. Sandbox is every row's answer on Dataverse online, which is why it is no longer a
         /// column; anything else is a real surprise and is worth the line.
         /// </summary>
-        private static string RowNote(AssemblyInfo assembly, string state)
+        private string RowNote(AssemblyInfo assembly, string state)
         {
-            return assembly.IsolationMode == 2
-                ? state
-                : state + "\r\nRegistered outside the sandbox, in full trust.";
+            return state
+                   + (assembly.IsolationMode == 2 ? string.Empty : "\r\nRegistered outside the sandbox, in full trust.")
+                   + (_newAssemblies.Contains(assembly.Id) ? "\r\n" + NewNote : string.Empty);
         }
 
         /// <summary>

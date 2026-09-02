@@ -14,7 +14,7 @@ from an environment somebody already registered, back into your source.
 | | |
 |---|---|
 | [Getting started](getting-started.md) | Install it, connect, and do a first run. |
-| [Choosing assemblies](choosing-assemblies.md) | Why the list starts short, what the two switches hold, and how the filter behaves. |
+| [Choosing assemblies](choosing-assemblies.md) | Why the list starts short, what the two switches hold, how the filter behaves, and what is remembered between sessions. |
 | [What gets written](output.md) | Both output modes in full: what is emitted, what is suppressed, and in what order. |
 | [Writing to files](writing-files.md) | How a class is matched to a file, what is replaced, the backups, and the report. |
 | [Attribute definitions file](attribute-definitions.md) | Making the emitted attributes compile, with or without the NuGet package. |

@@ -90,6 +90,38 @@ not Microsoft's, so the column said `Sandbox` down every row you were shown whil
 exceptions sat behind the **Microsoft's** switch. An assembly registered in full trust —
 which happens on-premises — says so in its tooltip instead.
 
+## What is remembered
+
+The ticks on both lists and the source folder, per environment. The first **Load
+Assemblies** after opening the tool puts them back: the assemblies you had ticked are ticked
+again, the classes you had unticked stay unticked, and the folder box is filled in unless
+you have already typed one. An assembly that has gone from the environment since is simply
+not ticked back.
+
+Only that first load restores. Pressing **Load Assemblies** again in the same session starts
+over, as it always has, and **Refresh** keeps whatever you have. The memory is written as
+you go rather than when the tab closes, so a crash costs nothing.
+
+Anything on either list that was not there the last time you had the environment open is
+**set in bold**, with the reason in the row's tooltip and a count on the status line:
+
+```
+3 assemblies · 6 of 6 classes · 1 new
+```
+
+For assemblies that means any row the environment lists now and did not list then. For
+classes it means one you had not seen, in an assembly whose classes you had looked at
+before — or in an assembly that is itself new. Ticking an assembly for the first time does
+not set its whole group in bold; every class in it is unseen, and marking them all would say
+nothing.
+
+The count is of rows on screen, so it always matches what a scroll would find. A new
+assembly behind the **Managed** switch is in the "out of view" arithmetic instead. The marks
+stay for the session, and are gone the next time you open the environment.
+
+One file per environment, beside the tool's other settings in XrmToolBox's settings folder,
+named `PluginStepCodegen_memory-<environment>.xml`. Delete it to forget an environment.
+
 ## What is never listed
 
 Assemblies flagged `ishidden` — internal plumbing the platform registers for itself. Steps
