@@ -18,6 +18,13 @@
   keeps what you have. A class counts as new only against an assembly whose classes you had
   looked at before: ticking one for the first time does not mark the whole group.
 
+- **Selecting a class in either list scrolls the preview to its block and tints it.**
+  Picking a row under the source folder already found its class on the left; the preview
+  was still read from the top down to find what that class would be given. Now the block
+  comes up to the top of the pane on a pale yellow, and follows the preview when you tick
+  or untick others. A class that is not ticked is not in the preview, so it leaves the pane
+  where it is.
+
 ## 1.2.0
 
 - **A registered class with no steps is no longer filed as unregistered.** A plugin type

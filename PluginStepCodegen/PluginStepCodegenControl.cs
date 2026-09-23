@@ -184,6 +184,11 @@ namespace PluginStepCodegen
         /// <summary>Set while one list's selection is being echoed into the other.</summary>
         private bool _syncingSelection;
 
+        /// <summary>Where each class's block sits in the preview, while the preview is the classes.</summary>
+        private readonly Dictionary<Guid, KeyValuePair<int, int>> _previewBlocks = new Dictionary<Guid, KeyValuePair<int, int>>();
+        private Guid _previewMarked;
+        private static readonly Color PreviewMarkColor = Color.FromArgb(255, 246, 191);
+
         /// <summary>
         /// Classes whose file carries this tool's output and no longer agrees with the
         /// registration, worked out once per render and read by all three panes. Recomputing it
@@ -1758,6 +1763,9 @@ namespace PluginStepCodegen
         /// </summary>
         private void RenderPreview()
         {
+            _previewBlocks.Clear();
+            _previewMarked = Guid.Empty;
+
             var types = CheckedTypes();
             if (types.Count == 0)
             {
@@ -1780,6 +1788,7 @@ namespace PluginStepCodegen
                     sb.AppendLine("// ===== " + (names.TryGetValue(assembly, out name) ? name : "Unknown assembly"));
                 }
 
+                var start = sb.Length;
                 sb.AppendLine("// " + type.TypeName);
 
                 // One class that cannot be composed is said in its own place in the list,
@@ -1799,11 +1808,64 @@ namespace PluginStepCodegen
                     sb.AppendLine(line);
                 }
 
-                sb.AppendLine("public partial class " + type.ClassName);
+                sb.Append("public partial class " + type.ClassName);
+                _previewBlocks[type.Id] = new KeyValuePair<int, int>(start, sb.Length - start);
+                sb.AppendLine();
                 sb.AppendLine();
             }
 
-            CsSyntaxHighlighter.Apply(_txtPreview, sb.ToString());
+            // The RichTextBox keeps a bare \n for every \r\n it is given, so the offsets
+            // counted above are turned into its own before they are used.
+            var text = sb.ToString();
+            foreach (var id in _previewBlocks.Keys.ToList())
+            {
+                var block = _previewBlocks[id];
+                var from = BoxOffset(text, block.Key);
+                _previewBlocks[id] = new KeyValuePair<int, int>(from, BoxOffset(text, block.Key + block.Value) - from);
+            }
+
+            CsSyntaxHighlighter.Apply(_txtPreview, text);
+
+            var selected = _lvTypes.SelectedItems.Count > 0 ? _lvTypes.SelectedItems[0].Tag as PluginTypeInfo : null;
+            if (selected != null)
+            {
+                MarkInPreview(selected.Id);
+            }
+        }
+
+        private static int BoxOffset(string text, int index)
+        {
+            var returns = 0;
+            for (var i = 0; i < index; i++)
+            {
+                if (text[i] == '\r') returns++;
+            }
+
+            return index - returns;
+        }
+
+        /// <summary>
+        /// Brings a class's block to the top of the preview and tints it, so the row picked in
+        /// either list is found in the preview without reading down it. A class that is not
+        /// ticked is not in the preview, and leaves it where it is.
+        /// </summary>
+        private void MarkInPreview(Guid id)
+        {
+            KeyValuePair<int, int> block;
+            if (_previewMarked != Guid.Empty && _previewBlocks.TryGetValue(_previewMarked, out block))
+            {
+                CsSyntaxHighlighter.Tint(_txtPreview, block.Key, block.Value, _txtPreview.BackColor);
+            }
+
+            _previewMarked = Guid.Empty;
+            if (!_previewBlocks.TryGetValue(id, out block))
+            {
+                return;
+            }
+
+            CsSyntaxHighlighter.Tint(_txtPreview, block.Key, block.Value, PreviewMarkColor);
+            CsSyntaxHighlighter.ScrollToTop(_txtPreview, block.Key);
+            _previewMarked = id;
         }
 
         private const string GlyphFound = "✓";      // ✓
@@ -2384,6 +2446,7 @@ namespace PluginStepCodegen
             if (type != null)
             {
                 EchoSelection(_lvSource, item => item.Tag is Guid && (Guid)item.Tag == type.Id);
+                MarkInPreview(type.Id);
             }
         }
 
@@ -2396,6 +2459,7 @@ namespace PluginStepCodegen
 
             var id = (Guid)e.Item.Tag;
             EchoSelection(_lvTypes, item => ((PluginTypeInfo)item.Tag).Id == id);
+            MarkInPreview(id);
         }
 
         /// <summary>
@@ -2507,6 +2571,7 @@ namespace PluginStepCodegen
                     var report = (WriteReport)args.Result;
 
                     // A tally of what happened to which file, not source, so it is left uncoloured.
+                    _previewBlocks.Clear();
                     CsSyntaxHighlighter.Plain(_txtPreview, report.Format());
 
                     // What was stale is now current, and the marks should say so without being
@@ -2595,6 +2660,7 @@ namespace PluginStepCodegen
                         return;
                     }
 
+                    _previewBlocks.Clear();
                     CsSyntaxHighlighter.Apply(_txtPreview, AttributeDefinitions.Source);
                     MessageBox.Show(
                         "Wrote " + target + Environment.NewLine + Environment.NewLine

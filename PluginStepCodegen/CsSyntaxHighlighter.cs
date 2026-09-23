@@ -104,6 +104,39 @@ namespace PluginStepCodegen
             box.Select(0, 0);
         }
 
+        /// <summary>Lays a background under a stretch of the text, leaving its colouring alone.</summary>
+        public static void Tint(RichTextBox box, int start, int length, Color back)
+        {
+            if (start < 0 || length <= 0 || start + length > box.TextLength) return;
+
+            SendMessage(box.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
+            try
+            {
+                box.Select(start, length);
+                box.SelectionBackColor = back;
+                box.Select(start, 0);
+            }
+            finally
+            {
+                SendMessage(box.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero);
+                box.Invalidate();
+            }
+        }
+
+        private const int EM_GETFIRSTVISIBLELINE = 0x00CE;
+        private const int EM_LINESCROLL = 0x00B6;
+
+        /// <summary>
+        /// Scrolls so the line holding the character is the first one showing, where
+        /// ScrollToCaret would stop as soon as it had crept onto the bottom edge.
+        /// </summary>
+        public static void ScrollToTop(RichTextBox box, int charIndex)
+        {
+            var line = box.GetLineFromCharIndex(charIndex);
+            var first = (int)SendMessage(box.Handle, EM_GETFIRSTVISIBLELINE, IntPtr.Zero, IntPtr.Zero);
+            SendMessage(box.Handle, EM_LINESCROLL, IntPtr.Zero, (IntPtr)(line - first));
+        }
+
         private static Color? ColorFor(Match match)
         {
             if (match.Groups["doc"].Success) return CommentColor;
