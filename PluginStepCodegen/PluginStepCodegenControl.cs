@@ -2572,6 +2572,7 @@ namespace PluginStepCodegen
 
                     // A tally of what happened to which file, not source, so it is left uncoloured.
                     _previewBlocks.Clear();
+                    _previewMarked = Guid.Empty;
                     CsSyntaxHighlighter.Plain(_txtPreview, report.Format());
 
                     // What was stale is now current, and the marks should say so without being
@@ -2661,6 +2662,7 @@ namespace PluginStepCodegen
                     }
 
                     _previewBlocks.Clear();
+                    _previewMarked = Guid.Empty;
                     CsSyntaxHighlighter.Apply(_txtPreview, AttributeDefinitions.Source);
                     MessageBox.Show(
                         "Wrote " + target + Environment.NewLine + Environment.NewLine

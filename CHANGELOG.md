@@ -25,6 +25,8 @@
   or untick others. A class that is not ticked is not in the preview, so it leaves the pane
   where it is.
 
+  ![The picked class, brought to the top of the preview and tinted](assets/changelog-preview-follows.png)
+
 ## 1.2.0
 
 - **A registered class with no steps is no longer filed as unregistered.** A plugin type

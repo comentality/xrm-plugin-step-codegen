@@ -195,6 +195,26 @@ namespace PluginStepCodegen.UiHarness
                 };
                 collapse.Start();
             }
+
+            // A source row picked the way a person picks it, once the scan has filled the list
+            // and the debounced preview has rendered, so the shot shows the preview following
+            // the pick. The row is the third ticked class the scan found, so following it means
+            // scrolling rather than already being at the top.
+            if (Environment.GetEnvironmentVariable("UIHARNESS_SELECT_SOURCE") == "1")
+            {
+                var select = new Timer { Interval = 1200 };
+                select.Tick += (s, e) =>
+                {
+                    select.Stop();
+                    var blocks = Field<Dictionary<Guid, KeyValuePair<int, int>>>(control, "_previewBlocks");
+                    var row = Field<ListView>(control, "_lvSource").Items.Cast<ListViewItem>()
+                        .Where(i => i.Tag is Guid && blocks.ContainsKey((Guid)i.Tag))
+                        .Skip(2).FirstOrDefault();
+                    if (row == null) throw new InvalidOperationException("no source row for a ticked class");
+                    row.Selected = true;
+                };
+                select.Start();
+            }
         }
     }
 }
