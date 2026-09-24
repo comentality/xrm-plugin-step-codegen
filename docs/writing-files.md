@@ -53,21 +53,14 @@ toggle does not silently delete the work of the mode you switched away from.
 The comment block sits **above** the attributes, so that it stays contiguous with a hand
 written `<summary>` and the two read as one doc comment.
 
-## Backups
+## No backups
 
-Every file that changes gets a copy beside it named `<file>.yyyyMMddHHmmss.bak` — the
-original content, in the original encoding, before the write.
+Files are rewritten in place, in their original encoding, and no copy is kept. The tool
+assumes your source is under version control: the write shows up as a diff, and reverting
+it is the undo.
 
-A file whose content would not change is not rewritten and gets no backup; it is reported
-as *Already up to date*. Running twice in a row therefore produces one set of backups, not
-two.
-
-The backup name is accurate to the second. Two writes to the same file inside the same
-second collide, and the first backup is the one lost — which only happens if the same
-class is registered in two assemblies you have both ticked.
-
-Nothing cleans these up. They are `.bak` files in your source tree; add `*.bak` to
-`.gitignore` or sweep them when you are happy with the result.
+A file whose content would not change is not rewritten at all; it is reported as *Already
+up to date*.
 
 ## The report
 

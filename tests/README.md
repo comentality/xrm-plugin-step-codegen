@@ -753,7 +753,7 @@ exists. Afterwards:
 
 - the summary, the hand written `<remarks>` and the `[Obsolete]` are untouched
 - the stale `[Step]` and the stale `Register:` block are replaced, not appended to
-- a second run changes nothing, and leaves no second `.bak`
+- a second run changes nothing
 
 ```csharp
 [Plugin]
@@ -864,10 +864,8 @@ and the registration that is *not* in the file is Contoso's:
 [Step("Update", "account", "name", Stages.PreOperation, ExecutionMode.Synchronous, ExecutionOrder = 4)]
 ```
 
-The write report names `Twin` twice under "Updated", which is the only warning given. Note
-also that both writes take a backup and the backup name is only accurate to the second, so
-the two collide and the pristine original is the copy that gets lost. Whether that is
-acceptable is a decision; that it happens is pinned here.
+The write report names `Twin` twice under "Updated", which is the only warning given.
+Whether that is acceptable is a decision; that it happens is pinned here.
 
 ### Rival - settled by namespace across assemblies
 

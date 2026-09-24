@@ -69,8 +69,8 @@ are there twice, which is `CS0101` and means you have both. See
 [Attribute definitions file](attribute-definitions.md).
 
 **I want the old file back.**
-Every changed file has a `<file>.yyyyMMddHHmmss.bak` copy beside it from immediately before
-the write.
+From source control. The tool keeps no copy of its own; it assumes your source is under
+version control, and the write is a diff you can revert like any other.
 
 **Something threw.**
 Errors are shown with their detail rather than swallowed. If it looks like a bug in the

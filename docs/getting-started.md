@@ -71,7 +71,8 @@ preview is replaced by a report of what happened:
 //   ErpOrderSync
 ```
 
-Every file that changed has a timestamped `.bak` copy beside it. Run it twice and the
+Files are rewritten in place, with no backup copy: review the change in your source
+control's diff, and revert there if you do not like it. Run it twice and the
 second run reports everything as already up to date: the output is stable, so it is safe to
 put in a habit.
 

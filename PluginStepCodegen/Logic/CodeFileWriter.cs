@@ -295,7 +295,8 @@ namespace PluginStepCodegen.Logic
         }
 
         /// <summary>
-        /// Writes the spliced file, leaving a timestamped .bak copy beside it.
+        /// Writes the spliced file in place. No copy is kept: the source is assumed to be under
+        /// source control, which is a better undo than a .bak beside every file.
         /// Returns false when the file already had exactly these attributes.
         /// </summary>
         public static bool Update(string filePath, string className, IEnumerable<string> remarks, IEnumerable<string> attributes)
@@ -309,7 +310,6 @@ namespace PluginStepCodegen.Logic
                 return false;
             }
 
-            File.WriteAllText(filePath + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak", original, encoding);
             File.WriteAllText(filePath, updated, encoding);
             return true;
         }

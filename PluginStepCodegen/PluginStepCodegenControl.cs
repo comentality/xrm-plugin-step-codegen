@@ -1595,9 +1595,7 @@ namespace PluginStepCodegen
             // is still live for however long the environment takes. On a fast link that hardly
             // matters. On a slow one, pressing Load again because the first press did not seem to
             // do anything costs a second full query whose answer clears everything ticked since
-            // the first, and pressing Write twice puts two writers over the same files - where the
-            // backup name is only accurate to the second, so the two collide and the pristine
-            // original is the copy that is lost.
+            // the first, and pressing Write twice puts two writers over the same files at once.
             _btnLoadAssemblies.Enabled = !_loadingAssemblies;
             _btnRefresh.Enabled = _loaded && !_loadingAssemblies;
             _btnWrite.Enabled = hasChecked && hasFolder && _folderBusy == null && !Outstanding;
@@ -2539,8 +2537,7 @@ namespace PluginStepCodegen
             };
 
             // Held down for the duration, because the button is otherwise live throughout its own
-            // write: two writers over the same files, and a backup name only accurate to the
-            // second, so the two .bak copies collide and the pristine original is the one lost.
+            // write, and two writers over the same files at once is not something to offer.
             Busy("Writing " + types.Count + (types.Count == 1 ? " class..." : " classes..."));
 
             WorkAsync(new WorkAsyncInfo
@@ -2582,9 +2579,7 @@ namespace PluginStepCodegen
 
                     MessageBox.Show(
                         report.Written.Count + " file(s) updated, " + report.Unchanged.Count
-                        + " unchanged, " + report.Skipped + " skipped."
-                        + Environment.NewLine + Environment.NewLine
-                        + "A timestamped .bak copy was left beside every file that changed.",
+                        + " unchanged, " + report.Skipped + " skipped.",
                         "Write complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             });

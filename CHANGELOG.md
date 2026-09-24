@@ -27,6 +27,10 @@
 
   ![The picked class, brought to the top of the preview and tinted](assets/changelog-preview-follows.png)
 
+- **Write to Files no longer leaves a timestamped .bak copy beside every file it changes.**
+  Your source control already holds the original, and the write is a diff you can review and
+  revert there; the copies were only clutter to sweep up or ignore afterwards.
+
 ## 1.2.0
 
 - **A registered class with no steps is no longer filed as unregistered.** A plugin type

@@ -394,10 +394,8 @@ Check 'exactly the seventeen expected files changed' `
     ($unexpected.Count -eq 0 -and $unwritten.Count -eq 0) `
     "(unexpected: $($unexpected -join ', '); missed: $($unwritten -join ', '))"
 
-Check 'every changed file left a .bak beside it' `
-    (@($expectedChangedA | Where-Object {
-        -not (Get-ChildItem (Join-Path $sandboxA $_).Replace('.cs', '.cs.*.bak') -ErrorAction SilentlyContinue)
-    }).Count -eq 0)
+Check 'no .bak copy was left anywhere' `
+    (@(Get-ChildItem $sandboxA -Recurse -Filter *.bak).Count -eq 0)
 
 # The emitted attributes compile - against the very definitions file the tool drops.
 dotnet build (Join-Path $sandboxA 'TestPlugins') -c Debug --nologo -v q | Out-Null

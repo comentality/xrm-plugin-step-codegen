@@ -66,8 +66,8 @@ The Tool Library installs it from nuget, where it lives as
    `XrmToolsMetaAttributes.cs` into your project so the emitted attributes compile
    without the NuGet package or the Visual Studio extension.
 
-Every file that changes gets a timestamped `.bak` copy beside it, and nothing is ever
-written to the environment.
+Files are rewritten in place with no backup copy — your source control is the undo — and
+nothing is ever written to the environment.
 
 ## Output
 
@@ -132,7 +132,7 @@ express: a **disabled** step, and the user a step impersonates, as `As <name>`.
 | [Getting started](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/getting-started.md) | Install it, connect, and do a first run. |
 | [Choosing assemblies](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/choosing-assemblies.md) | Why the list starts short, what the two switches hold, how the filter behaves, and what is remembered between sessions. |
 | [What gets written](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/output.md) | Both output modes in full: what is emitted, what is suppressed, and in what order. |
-| [Writing to files](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/writing-files.md) | How a class is matched to a file, what is replaced, the backups, and the report. |
+| [Writing to files](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/writing-files.md) | How a class is matched to a file, what is replaced, and the report. |
 | [Attribute definitions file](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/attribute-definitions.md) | Making the emitted attributes compile, with or without the NuGet package. |
 | [Limits and troubleshooting](https://github.com/comentality/xrm-plugin-step-codegen/blob/main/docs/limits.md) | What the tool cannot express, and what to do when a run does not go as expected. |
 

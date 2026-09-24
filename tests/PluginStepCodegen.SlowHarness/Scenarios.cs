@@ -268,9 +268,7 @@ namespace PluginStepCodegen.SlowHarness
         /// <summary>
         /// Write is offered while the environment still owes an answer, and again while the write
         /// it already started is running. The first writes a half-loaded list with a report that
-        /// reads like a complete one; the second puts two writers over the same files, and the
-        /// backup name is only accurate to the second, so the two collide and the pristine
-        /// original is the copy that is lost.
+        /// reads like a complete one; the second puts two writers over the same files at once.
         /// </summary>
         private static Scenario WriteGuarded()
         {
