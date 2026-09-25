@@ -8,7 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Company>Comentality</Company>
     <Authors>Comentality</Authors>
-    <Description>Document Dataverse plugin step registrations directly in your C# source, as Xrm Tools compatible [Plugin], [Step] and [Image] attributes.</Description>
+    <Description>Document your registered plugin steps in your existing C# code, as Xrm Tools attributes or a summary comment. Reads the steps and images registered in a Dataverse environment and writes them into the plugin classes they run, so registration shows up in code review, diffs and git history.</Description>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <NuspecFile>PluginStepCodegen.nuspec</NuspecFile>
   </PropertyGroup>

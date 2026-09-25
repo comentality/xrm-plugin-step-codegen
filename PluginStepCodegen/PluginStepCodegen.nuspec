@@ -10,7 +10,7 @@
     <repository type="git" url="https://github.com/comentality/xrm-plugin-step-codegen.git" branch="main" />
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
-    <description>Document Dataverse plugin step registrations directly in your C# source. Reads registered steps and images from the connected environment and writes them back into your plugin classes as [Plugin], [Step] and [Image] attributes in Xrm Tools format.</description>
+    <description>Document your registered plugin steps in your existing C# code, as Xrm Tools attributes or a summary comment. Reads the steps and images registered in a Dataverse environment and writes them into the plugin classes they run, so registration shows up in code review, diffs and git history.</description>
     <releaseNotes>v1.2.0
 - A registered class with no steps is no longer filed as unregistered.
 - The assembly list drops its Isolation column and spends the width on saying what is wrong with each assembly's source.
