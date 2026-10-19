@@ -31,6 +31,11 @@
   Your source control already holds the original, and the write is a diff you can review and
   revert there; the copies were only clutter to sweep up or ignore afterwards.
 
+- The tool's home is now [comentality.com/tools](https://comentality.com/tools/#plugin-step-codegen):
+  the package page's project link goes there, and the README says so. The source and these
+  notes stay on GitHub. The store listing's description was reworded to say what the
+  tool leaves in your code, with both outputs named.
+
 ## 1.2.0
 
 - **A registered class with no steps is no longer filed as unregistered.** A plugin type
