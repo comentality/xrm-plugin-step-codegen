@@ -12,6 +12,9 @@ compatible `[Plugin]`, `[Step]` and `[Image]` attributes.
 Your registration stops living only in an environment you have to go look at, and starts
 living in the code review, the diff and the git history.
 
+Its home is [comentality.com/tools](https://comentality.com/tools/#plugin-step-codegen);
+this repository is where it is built.
+
 ![Plugin Step Codegen: assemblies and classes on the left, the attributes it would write on the right](https://raw.githubusercontent.com/comentality/xrm-plugin-step-codegen/main/assets/ui-attributes.png)
 
 ## Why

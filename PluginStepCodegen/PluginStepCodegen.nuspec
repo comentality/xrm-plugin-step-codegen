@@ -6,7 +6,7 @@
     <title>Plugin Step Codegen</title>
     <authors>Comentality</authors>
     <license type="expression">MIT</license>
-    <projectUrl>https://github.com/comentality/xrm-plugin-step-codegen</projectUrl>
+    <projectUrl>https://comentality.com/tools/#plugin-step-codegen</projectUrl>
     <repository type="git" url="https://github.com/comentality/xrm-plugin-step-codegen.git" branch="main" />
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
