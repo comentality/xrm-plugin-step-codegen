@@ -1,5 +1,7 @@
 ﻿# Changelog
 
+## Unreleased
+
 ## 1.3.0
 
 - **The tool remembers what you ticked and where your source is, and marks whatever
