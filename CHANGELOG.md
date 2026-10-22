@@ -1,6 +1,6 @@
 ﻿# Changelog
 
-## Unreleased
+## 1.3.0
 
 - **The tool remembers what you ticked and where your source is, and marks whatever
   was not there last time.** Every opening used to start from nothing: load, find your

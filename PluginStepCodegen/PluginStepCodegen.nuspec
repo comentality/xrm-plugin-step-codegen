@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>Comentality.PluginStepCodegen</id>
-    <version>1.2.1-dev</version>
+    <version>1.3.0</version>
     <title>Plugin Step Codegen</title>
     <authors>Comentality</authors>
     <license type="expression">MIT</license>
@@ -11,7 +11,13 @@
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
     <description>Document your registered plugin steps in your existing C# code, as Xrm Tools attributes or a summary comment. Reads the steps and images registered in a Dataverse environment and writes them into the plugin classes they run, so registration shows up in code review, diffs and git history.</description>
-    <releaseNotes>v1.2.0
+    <releaseNotes>v1.3.0
+- The tool remembers what you ticked and where your source is, and marks whatever was not there last time.
+- Selecting a class in either list scrolls the preview to its block and tints it.
+- Write to Files no longer leaves a timestamped .bak copy beside every file it changes.
+Full changelog, with screenshots: https://github.com/comentality/xrm-plugin-step-codegen/releases/tag/v1.3.0
+
+v1.2.0
 - A registered class with no steps is no longer filed as unregistered.
 - The assembly list drops its Isolation column and spends the width on saying what is wrong with each assembly's source.
 - Stale files have a group of their own, so "what have I got to rewrite" is one look rather than a scan.
@@ -23,7 +29,6 @@
 - The summary comment is grouped by table, so a plugin registered against a dozen tables reads as a dozen short lists.
 - The docs, the store listing and the generated definitions file now name Xrm Tools as whose attribute model this is.
 - Nothing that goes wrong should reach XrmToolBox's crash dialog.
-Full changelog, with screenshots: https://github.com/comentality/xrm-plugin-step-codegen/releases/tag/v1.2.0
 
 v1.1.0
 - An image or filter covering nearly all of a table's columns can say "all columns except" instead of reciting seventy names.
