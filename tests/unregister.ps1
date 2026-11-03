@@ -51,6 +51,16 @@ foreach ($name in $names) {
 
 Unregister-Unmanaged -Manifest $manifest -Environment $Environment
 
+# Asked of the environment rather than assumed. pac exits clean for a solution that is not
+# there, so a fixture installed under a name this manifest no longer uses - the solutions were
+# PluginDocumenterE2E* once - sails through the loop above and stays. Every fixture id starts
+# the same way, so whatever is left can be found without knowing what it was installed as.
+$left = @(Get-DataverseRecords 'pluginassemblies?$select=name,pluginassemblyid' | ForEach-Object { $_ } |
+    Where-Object { $_.pluginassemblyid -like '9a5b3c10-*' })
+if ($left.Count -gt 0) {
+    throw "Still registered, under a solution this manifest does not name: $(($left.name) -join ', ')"
+}
+
 Write-Host ''
 Write-Host 'Unregistered. Every fixture assembly and all of their steps are gone.'
 
