@@ -32,6 +32,12 @@
   Registration Tool's own profiler library, reads the fixture before, during and after, and
   fails unless all three readings are identical down to every emitted line.
 
+- The end to end fixtures and the harness sample are named and laid out like a real plugin
+  project: organisation.project assemblies, verbose class names ending in `Plugin`, several
+  namespaces per assembly, and source in nested folders that mirror them. Ids and keys did
+  not change, but an environment registered before this needs `tests\unregister.ps1` and
+  then `tests\register.ps1`, because neither route renames a registered assembly in place.
+
 ## 1.3.0
 
 - **The tool remembers what you ticked and where your source is, and marks whatever
