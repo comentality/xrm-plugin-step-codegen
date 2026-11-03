@@ -29,6 +29,8 @@
   widest line, and a splitter dragged past it settles back there when you let go. A pane you
   drag keeps the width you gave it, so in a tight window you can choose which one gets the room.
 
+  ![Deep source paths shown in full, with the State column at its own width](assets/changelog-fitted-columns.png)
+
 - `tests\profile.ps1` profiles every step of the end to end fixture with the Plugin
   Registration Tool's own profiler library, reads the fixture before, during and after, and
   fails unless all three readings are identical down to every emitted line.
