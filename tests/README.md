@@ -18,9 +18,10 @@ assemblies: a second vendor, a registration with no source, an assembly with no 
 .\xtb.ps1           # build the tool and open it in an XrmToolBox of its own
 .\write.ps1         # check the write path headlessly, no environment needed
 .\slow.ps1          # check the window on a slow link, no environment needed
+.\profile.ps1       # profile every fixture step and check nothing reads differently
 ```
 
-All four use the active organization of the current `pac` auth profile; pass
+The ones that need an environment use the active organization of the current `pac` auth profile; pass
 `-Environment <url>` to target another. `register.ps1` is safe to re-run.
 
 `pac` only reads, and two assemblies here are registered rather than imported, so the
@@ -103,6 +104,7 @@ copy of them to be wrong.
 | `compat.ps1`, `compat\` | The emitted attributes against the real `XrmTools.Meta.Attributes` package, pulled from nuget.org. Everything else here judges the tool against this repository's own copy of the shape; this is the only thing that asks whether that copy is still upstream's. Needs the network, not an environment. |
 | `perf.ps1`, `PluginStepCodegen.PerfHarness\` | What the scan and the write *cost*, over generated repositories of 250 to 4000 files. Everything else here asks whether the answer is right; this asks whether waiting for it is reasonable. No environment needed. |
 | `slow.ps1`, `PluginStepCodegen.SlowHarness\` | The window *while* somebody waits: which buttons are live, what the status lines claim, and whether the answer that lands last belongs to the question asked last. Drives the real control against a Dataverse that answers in seconds. No environment needed. |
+| `profile.ps1`, `PluginStepCodegen.ProfileHarness\` | A profiled step against the same step unprofiled. Profiles the registered fixture with the Plugin Registration Tool's own profiler library and reads it through the real `RegistrationQuery` before, during and after. Needs the environment and `register.ps1`. |
 | `harness\` | The sample environment, the window capture and the window itself, shared by the UI and slow harnesses so the two cannot disagree about what "the sample" is. |
 
 `TestPlugins.snk` and `keys/Contoso.snk` are committed on purpose. The public key token is
@@ -369,6 +371,48 @@ whichever process asks, so the harness points it at `tests\.slow\xtb-home` — w
 run — before the first scenario opens. Nothing here reads the user's settings or leaves
 anything in them.
 
+## Profiled steps — `profile.ps1`
+
+```powershell
+.\profile.ps1                  # profile, compare, stop profiling
+.\profile.ps1 -NoBuild         # reuse the last build
+```
+
+**Start Profiling** in the Plugin Registration Tool does three things to a step, and none of
+them is something the plugin's author registered. It renames the step `<name> (Profiled)`,
+switches it off, and registers a stand-in step against `PluginProfiler.Plugins.ProfilerPlugin`
+in its place, moving the step's images onto it. The stand-in's configuration names the
+original step and its old name. Read at face value, a step somebody is debugging is a
+disabled step with a custom name and no images, and the profiler has one step per profiled
+step to document.
+
+The tool reads through that: the stand-ins come back in the same step query, and a profiled
+step takes its name, its on/off state and its images from its stand-in. This script is what
+holds it to "exactly as if it were not profiled":
+
+1. Reads the six fixture assemblies through `RegistrationQuery` and renders every field of
+   every step and image, plus every line both emitters write.
+2. Installs the profiler if the environment has none. The registration tool's own
+   `InstallProfiler` imports `PluginProfiler.Solution.cab` from the package, which takes a minute
+   the first time.
+3. Profiles every enabled fixture step with `ProfilerManagementUtility.EnablePlugin`, the call
+   behind the button, from `Microsoft.CrmSdk.XrmTooling.PluginRegistrationTool` on nuget.org.
+   It then checks on the wire that every profiled step really did come back disabled and
+   renamed, so a profiler that quietly did nothing cannot pass. The three steps the matrix
+   leaves disabled cannot be profiled and are read as disabled throughout.
+4. Reads again, and the rendering has to match step 1 character for character. Then once more
+   with the profiler's own assembly in the batch, where `ProfilerPlugin` must have no steps.
+5. Stops profiling with the registration tool's `DisablePlugin` and reads a third time.
+
+The harness connects with the token `pac` already holds, handed to a web proxy client because
+the connector that version of the library needs predates token callbacks. A run that dies half
+way leaves steps profiled, so the next one stops profiling any fixture step before it starts.
+The profiler solution stays installed. `unregister.ps1` does not remove it, because it may have
+been there before the fixture was.
+
+The three renderings are left in `tests\.profile` to diff. Against the code before this
+existed, the profiled reading differed for 40 steps and the profiler type was listed with 40
+of its own.
 ## Windows nobody has to look at
 
 Both UI harnesses open real windows on a real desktop, and neither of them needs to be seen.

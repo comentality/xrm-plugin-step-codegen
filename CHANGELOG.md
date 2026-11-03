@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **A step you are profiling is documented exactly as registered, not as a disabled step
+  called "(Profiled)".** Start Profiling in the Plugin Registration Tool renames the step,
+  switches it off, and moves its images onto a stand-in step on the profiler's own plugin
+  type. The tool read that at face value: the comment said *disabled*, the generated name
+  came out as a custom one, and the images were gone. Now a profiled step reads with its own
+  name, its images and its real on/off state, and the profiler's stand-ins are no longer
+  listed as steps of the profiler. Finding them costs no extra round trip.
+
+- `tests\profile.ps1` profiles every step of the end to end fixture with the Plugin
+  Registration Tool's own profiler library, reads the fixture before, during and after, and
+  fails unless all three readings are identical down to every emitted line.
+
 ## 1.3.0
 
 - **The tool remembers what you ticked and where your source is, and marks whatever

@@ -26,3 +26,6 @@ tests/.perf/
 
 # Windows and screenshots slow.ps1 drives, rewritten on every run.
 tests/.slow/
+
+# The readings profile.ps1 compares, rewritten on every run.
+tests/.profile/

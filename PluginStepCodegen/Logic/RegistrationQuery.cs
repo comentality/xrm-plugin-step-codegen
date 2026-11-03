@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml;
+using System.Xml.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Metadata.Query;
@@ -84,25 +86,52 @@ namespace PluginStepCodegen.Logic
                 return nothing;
             }
 
+            // The profiler's stand-ins come back once per chunk of ids, so a step is only
+            // placed the first time it is seen.
             var stepsById = new Dictionary<Guid, PluginStepInfo>();
-            foreach (var pair in steps)
+            var standIns = new List<StepRow>();
+            foreach (var row in steps)
             {
+                if (row.ProfiledStepId != Guid.Empty)
+                {
+                    standIns.Add(row);
+                    continue;
+                }
+
                 PluginTypeInfo type;
-                if (!byId.TryGetValue(pair.Value, out type))
+                if (!byId.TryGetValue(row.TypeId, out type) || stepsById.ContainsKey(row.Step.Id))
                 {
                     continue;
                 }
 
-                type.Steps.Add(pair.Key);
-                stepsById[pair.Key.Id] = pair.Key;
+                type.Steps.Add(row.Step);
+                stepsById[row.Step.Id] = row.Step;
+            }
+
+            // A profiled step is read as the step it was before somebody pressed Start Profiling:
+            // its own name, switched on or off as its stand-in is, and with the images the
+            // profiler moved onto the stand-in. The stand-in itself is never listed - it is not a
+            // registration of the profiler's type, it is somebody's debugging session.
+            var imageOwners = new Dictionary<Guid, PluginStepInfo>(stepsById);
+            foreach (var standIn in standIns)
+            {
+                PluginStepInfo profiled;
+                if (imageOwners.ContainsKey(standIn.Step.Id) || !stepsById.TryGetValue(standIn.ProfiledStepId, out profiled))
+                {
+                    continue;
+                }
+
+                profiled.Name = standIn.ProfiledStepName ?? Unprofiled(profiled.Name);
+                profiled.IsDisabled = standIn.Step.IsDisabled;
+                imageOwners[standIn.Step.Id] = profiled;
             }
 
             if (stepsById.Count > 0)
             {
-                foreach (var image in GetImages(service, stepsById.Keys.ToList(), stop))
+                foreach (var image in GetImages(service, imageOwners.Keys.ToList(), stop))
                 {
                     PluginStepInfo step;
-                    if (stepsById.TryGetValue(image.Value, out step))
+                    if (imageOwners.TryGetValue(image.Value, out step))
                     {
                         step.Images.Add(image.Key);
                     }
@@ -163,29 +192,64 @@ namespace PluginStepCodegen.Logic
                 .ToList();
         }
 
-        /// <summary>Returns each step paired with the id of the plugin type it belongs to.</summary>
-        private static List<KeyValuePair<PluginStepInfo, Guid>> GetSteps(IOrganizationService service, List<Guid> typeIds, Func<bool> stop)
+        /// <summary>
+        /// The plugin type the registration tool's profiler registers its stand-in steps against.
+        /// Start Profiling renames the step "&lt;name&gt; (Profiled)", switches it off, and registers
+        /// a step on this type in its place, with the step's images moved onto it and the
+        /// original's id and name written into its configuration.
+        /// </summary>
+        private const string ProfilerTypeName = "PluginProfiler.Plugins.ProfilerPlugin";
+
+        private const string ProfiledSuffix = " (Profiled)";
+
+        private class StepRow
+        {
+            public PluginStepInfo Step;
+            public Guid TypeId;
+            /// <summary>The step this one stands in for, when it is the profiler's; otherwise empty.</summary>
+            public Guid ProfiledStepId;
+            public string ProfiledStepName;
+        }
+
+        /// <summary>
+        /// Returns each step with the id of the plugin type it belongs to - and, from anywhere in
+        /// the environment, every step the profiler is standing in with, which is the only way to
+        /// tell a profiled step from one somebody switched off and renamed.
+        /// </summary>
+        private static List<StepRow> GetSteps(IOrganizationService service, List<Guid> typeIds, Func<bool> stop)
         {
             return Retrieve(service, typeIds, stop, ids => BuildStepQuery(ids))
-                .Select(e => new KeyValuePair<PluginStepInfo, Guid>(
-                    new PluginStepInfo
+                .Select(e =>
+                {
+                    var row = new StepRow { Step = ReadStep(e), TypeId = GetLookupId(e, "plugintypeid") };
+                    if (GetAliased<string>(e, "pt.typename") == ProfilerTypeName)
                     {
-                        Id = e.Id,
-                        Name = e.GetAttributeValue<string>("name"),
-                        Stage = GetOptionSet(e, "stage", 40),
-                        Mode = GetOptionSet(e, "mode", 0),
-                        Rank = e.GetAttributeValue<int?>("rank") ?? 1,
-                        FilteringAttributes = e.GetAttributeValue<string>("filteringattributes"),
-                        Configuration = e.GetAttributeValue<string>("configuration"),
-                        Description = e.GetAttributeValue<string>("description"),
-                        AsyncAutoDelete = e.GetAttributeValue<bool?>("asyncautodelete") ?? false,
-                        IsDisabled = GetOptionSet(e, "statecode", 0) == 1,
-                        MessageName = GetAliased<string>(e, "msg.name"),
-                        PrimaryEntityName = GetAliased<string>(e, "flt.primaryobjecttypecode"),
-                        ImpersonatingUser = GetAliased<string>(e, "usr.fullname")
-                    },
-                    GetLookupId(e, "plugintypeid")))
+                        ReadProfilerConfiguration(row.Step.Configuration, out row.ProfiledStepId, out row.ProfiledStepName);
+                    }
+
+                    return row;
+                })
                 .ToList();
+        }
+
+        private static PluginStepInfo ReadStep(Entity e)
+        {
+            return new PluginStepInfo
+            {
+                Id = e.Id,
+                Name = e.GetAttributeValue<string>("name"),
+                Stage = GetOptionSet(e, "stage", 40),
+                Mode = GetOptionSet(e, "mode", 0),
+                Rank = e.GetAttributeValue<int?>("rank") ?? 1,
+                FilteringAttributes = e.GetAttributeValue<string>("filteringattributes"),
+                Configuration = e.GetAttributeValue<string>("configuration"),
+                Description = e.GetAttributeValue<string>("description"),
+                AsyncAutoDelete = e.GetAttributeValue<bool?>("asyncautodelete") ?? false,
+                IsDisabled = GetOptionSet(e, "statecode", 0) == 1,
+                MessageName = GetAliased<string>(e, "msg.name"),
+                PrimaryEntityName = GetAliased<string>(e, "flt.primaryobjecttypecode"),
+                ImpersonatingUser = GetAliased<string>(e, "usr.fullname")
+            };
         }
 
         private static QueryExpression BuildStepQuery(object[] typeIds)
@@ -198,9 +262,13 @@ namespace PluginStepCodegen.Logic
                     "asyncautodelete", "statecode", "plugintypeid", "sdkmessageid", "sdkmessagefilterid"),
                 Criteria =
                 {
+                    // The profiler's stand-ins ride along in the same round trip rather than a
+                    // query of their own: on a slow link the round trips are the wait.
+                    FilterOperator = LogicalOperator.Or,
                     Conditions =
                     {
-                        new ConditionExpression("plugintypeid", ConditionOperator.In, typeIds)
+                        new ConditionExpression("plugintypeid", ConditionOperator.In, typeIds),
+                        new ConditionExpression("pt", "typename", ConditionOperator.Equal, ProfilerTypeName)
                     }
                 }
             };
@@ -222,10 +290,68 @@ namespace PluginStepCodegen.Logic
                 EntityAlias = "usr",
                 Columns = new ColumnSet("fullname")
             };
+            var type = new LinkEntity("sdkmessageprocessingstep", "plugintype", "plugintypeid", "plugintypeid", JoinOperator.LeftOuter)
+            {
+                EntityAlias = "pt",
+                Columns = new ColumnSet("typename")
+            };
             query.LinkEntities.Add(message);
             query.LinkEntities.Add(filter);
             query.LinkEntities.Add(impersonated);
+            query.LinkEntities.Add(type);
             return query;
+        }
+
+        /// <summary>
+        /// The step a profiler stand-in replaces and the name it had, out of the configuration
+        /// the profiler serialized onto it - a data contract whose EventHandler is the original
+        /// step and whose OriginalEventHandlerName is its name before " (Profiled)" was added.
+        /// Read by element name alone, so the serializer's namespaces cannot get in the way.
+        /// Anything unreadable is left as an ordinary step, which is what it was before this.
+        /// </summary>
+        private static void ReadProfilerConfiguration(string configuration, out Guid stepId, out string stepName)
+        {
+            stepId = Guid.Empty;
+            stepName = null;
+            if (string.IsNullOrWhiteSpace(configuration))
+            {
+                return;
+            }
+
+            XElement root;
+            try
+            {
+                root = XElement.Parse(configuration);
+            }
+            catch (XmlException)
+            {
+                return;
+            }
+
+            var handler = Child(root, "EventHandler");
+            var id = handler == null ? null : Child(handler, "Id");
+            Guid parsed;
+            if (id == null || !Guid.TryParse(id.Value, out parsed))
+            {
+                return;
+            }
+
+            stepId = parsed;
+            var name = Child(root, "OriginalEventHandlerName");
+            stepName = name == null || name.Value.Length == 0 ? null : name.Value;
+        }
+
+        private static XElement Child(XElement parent, string localName)
+        {
+            return parent.Elements().FirstOrDefault(e => e.Name.LocalName == localName);
+        }
+
+        /// <summary>A profiled step's name when its stand-in did not record the original.</summary>
+        private static string Unprofiled(string name)
+        {
+            return name != null && name.EndsWith(ProfiledSuffix, StringComparison.Ordinal)
+                ? name.Substring(0, name.Length - ProfiledSuffix.Length)
+                : name;
         }
 
         /// <summary>Returns each image paired with the id of the step it belongs to.</summary>

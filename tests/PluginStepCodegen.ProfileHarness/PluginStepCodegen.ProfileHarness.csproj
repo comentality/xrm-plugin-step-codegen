@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <!-- The tool's build output carries the ADAL XrmToolBox ships and the registration tool's
+         connector wants its own older one. The connector's is the one copied, which is right:
+         nothing of the tool's that runs here signs anybody in. -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\PluginStepCodegen\PluginStepCodegen.csproj" />
+  </ItemGroup>
+
+  <!-- The profiling is done by the registration tool's own library, out of the package the
+       registration tool ships in, so what gets profiled is what Start Profiling does rather
+       than this repository's idea of it. The package is a tools package with nothing to
+       compile against, hence the path property and the hand written references. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.XrmTooling.PluginRegistrationTool" Version="9.1.0.235"
+                      GeneratePathProperty="true" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PrtTools>$(PkgMicrosoft_CrmSdk_XrmTooling_PluginRegistrationTool)\tools</PrtTools>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="PluginProfiler.Library" HintPath="$(PrtTools)\PluginProfiler.Library.dll" />
+    <Reference Include="PluginProfiler.Plugins" HintPath="$(PrtTools)\PluginProfiler.Plugins.dll" />
+    <Reference Include="Microsoft.Xrm.Sdk" HintPath="$(PrtTools)\Microsoft.Xrm.Sdk.dll" />
+    <Reference Include="Microsoft.Xrm.Sdk.Workflow" HintPath="$(PrtTools)\Microsoft.Xrm.Sdk.Workflow.dll" />
+    <Reference Include="Microsoft.Crm.Sdk.Proxy" HintPath="$(PrtTools)\Microsoft.Crm.Sdk.Proxy.dll" />
+    <Reference Include="Microsoft.Xrm.Tooling.Connector" HintPath="$(PrtTools)\Microsoft.Xrm.Tooling.Connector.dll" />
+    <Reference Include="Microsoft.IdentityModel.Clients.ActiveDirectory" HintPath="$(PrtTools)\Microsoft.IdentityModel.Clients.ActiveDirectory.dll" />
+    <Reference Include="Newtonsoft.Json" HintPath="$(PrtTools)\Newtonsoft.Json.dll" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Activities" />
+    <!-- InstallProfiler imports this when the environment has no profiler yet. -->
+    <None Include="$(PrtTools)\PluginProfiler.Solution.cab" CopyToOutputDirectory="PreserveNewest" Link="PluginProfiler.Solution.cab" />
+  </ItemGroup>
+</Project>
