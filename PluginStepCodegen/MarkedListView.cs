@@ -1,31 +1,39 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace PluginStepCodegen
 {
+    /// <summary>One kind of mark a <see cref="MarkedListView"/> paints, and the rows that wear it.</summary>
+    public class RowMark
+    {
+        public Image Image;
+        public Func<ListViewItem, bool> Applies;
+    }
+
     /// <summary>
-    /// A details-view list that can paint a small mark just after a row's text, in the first
+    /// A details-view list that can paint small marks just after a row's text, in the first
     /// column, on the rows a predicate picks out. A ListView's own image goes before the text
     /// and indents every row to make room for it; a mark that follows the name, on the rows
     /// that have earned one and nowhere else, has to be painted by hand - after the control has
     /// painted itself, so selection and hover draw under it rather than over it.
+    ///
+    /// A row can earn more than one. They follow the name in the order they are listed here,
+    /// each after the last, and a row whose name leaves no room for one shows as many as fit.
     /// </summary>
     public class MarkedListView : ListView
     {
         private const int WmPaint = 0x000F;
 
-        /// <summary>The mark, or null for none.</summary>
-        public Image Mark { get; set; }
-
-        /// <summary>Which rows wear it. Null marks nothing.</summary>
-        public Func<ListViewItem, bool> IsMarked { get; set; }
+        /// <summary>The kinds of mark, in the order they follow the name.</summary>
+        public List<RowMark> Marks { get; } = new List<RowMark>();
 
         protected override void WndProc(ref Message m)
         {
             base.WndProc(ref m);
 
-            if (m.Msg == WmPaint && Mark != null && IsMarked != null && View == View.Details
+            if (m.Msg == WmPaint && Marks.Count > 0 && View == View.Details
                 && Columns.Count > 0 && Items.Count > 0 && !IsDisposed)
             {
                 PaintMarks();
@@ -39,11 +47,6 @@ namespace PluginStepCodegen
             {
                 foreach (ListViewItem item in Items)
                 {
-                    if (!IsMarked(item))
-                    {
-                        continue;
-                    }
-
                     // Where the text is drawn: the first column from the checkbox on, which
                     // is where a ListView starts the label.
                     var label = item.GetBounds(ItemBoundsPortion.Label);
@@ -52,28 +55,41 @@ namespace PluginStepCodegen
                         continue;
                     }
 
-                    var width = TextRenderer.MeasureText(g, item.Text, item.Font,
-                        new Size(int.MaxValue, label.Height),
-                        TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
-
-                    // The label has a couple of pixels of its own before the glyphs start; the
-                    // mark touches the last one and sits up like a superscript, its top clear
-                    // of the capitals and its bottom about level with the lower-case letters'
-                    // tops. Three pixels above the row is into the row above, which is blank
-                    // there; on the first row it is under the header, and that is accepted.
-                    var x = label.Left + 2 + width;
-                    var y = label.Top - 3;
-
-                    // Only inside the column: a name long enough to be cut short with an
-                    // ellipsis has no room after it, and the mark must not walk into the next
-                    // cell.
+                    int? x = null;
                     var cellRight = item.GetBounds(ItemBoundsPortion.Entire).Left + Columns[0].Width;
-                    if (x + Mark.Width > cellRight - 2)
+                    foreach (var mark in Marks)
                     {
-                        continue;
-                    }
+                        if (mark.Image == null || mark.Applies == null || !mark.Applies(item))
+                        {
+                            continue;
+                        }
 
-                    g.DrawImageUnscaled(Mark, x, y);
+                        if (x == null)
+                        {
+                            var width = TextRenderer.MeasureText(g, item.Text, item.Font,
+                                new Size(int.MaxValue, label.Height),
+                                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+
+                            // The label has a couple of pixels of its own before the glyphs
+                            // start; the mark touches the last one.
+                            x = label.Left + 2 + width;
+                        }
+
+                        // Only inside the column: a name long enough to be cut short with an
+                        // ellipsis has no room after it, and the mark must not walk into the
+                        // next cell.
+                        if (x.Value + mark.Image.Width > cellRight - 2)
+                        {
+                            break;
+                        }
+
+                        // Sits up like a superscript, its top clear of the capitals and its
+                        // bottom about level with the lower-case letters' tops. Three pixels
+                        // above the row is into the row above, which is blank there; on the
+                        // first row it is under the header, and that is accepted.
+                        g.DrawImageUnscaled(mark.Image, x.Value, label.Top - 3);
+                        x += mark.Image.Width + 1;
+                    }
                 }
             }
         }

@@ -123,7 +123,30 @@ The marks stay for the session, and are gone the next time you open the environm
 One file per environment, beside the tool's other settings in XrmToolBox's settings folder,
 named `PluginStepCodegen_memory-<environment>.xml`. Delete it to forget an environment.
 
+## Steps being profiled
+
+**Start Profiling** in the Plugin Registration Tool renames the step `<name> (Profiled)`,
+switches it off, and moves its images onto a stand-in step on the profiler's own plugin type.
+None of that is your registration, so the tool reads through it: a profiled step is
+documented with its own name, its own images and its real on/off state, exactly as if nobody
+were profiling it. What gets written does not change when you start or stop profiling.
+
+The window still says so, because a profiling session somebody forgot to stop leaves the real
+step switched off. A class with a profiled step wears **a small amber bug** after its name,
+and so does its assembly. The row's tooltip names the steps, and the status line counts them:
+
+![An assembly with a step being profiled](../assets/changelog-profiled-mark.png)
+
+```
+3 assemblies · 6 of 6 classes · 1 step being profiled
+```
+
+The count is of the steps in the listed classes. The bug goes once profiling is stopped and
+the list is refreshed.
 ## What is never listed
 
 Assemblies flagged `ishidden` — internal plumbing the platform registers for itself. Steps
 on those are not yours to document and there is no source anywhere to write them into.
+
+The profiler's stand-in steps. They exist only while somebody is profiling, and the step
+they stand in for is listed in their place, as above.

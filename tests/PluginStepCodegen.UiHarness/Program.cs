@@ -175,6 +175,19 @@ namespace PluginStepCodegen.UiHarness
                 Field<HashSet<Guid>>(control, "_newTypes").Add(fresh[fresh.Count - 1].Id);
             }
 
+            // A class with a step somebody is profiling, for the shot about the bug mark. Set on
+            // the step exactly as RegistrationQuery sets it once it has read through the
+            // profiler's stand-in; everything else about the step already reads as registered.
+            // UIHARNESS_PROFILED=both puts it on the class that is also new, so the two marks
+            // are seen sharing a row.
+            var profiled = Environment.GetEnvironmentVariable("UIHARNESS_PROFILED");
+            if (!string.IsNullOrEmpty(profiled))
+            {
+                var classes = typesByAssembly[assemblies[0].Id];
+                var target = profiled == "both" ? classes[classes.Count - 1] : classes[1];
+                target.Steps[0].IsProfiled = true;
+            }
+
             Invoke(control, "RenderAssemblies");
             Invoke(control, "RenderTypes");
 

@@ -135,13 +135,14 @@ namespace PluginStepCodegen.SlowHarness
         /// <summary>
         /// Whether a row wears the "new since last time" mark. Asked of the list that paints
         /// it, since the mark is painted after the name rather than kept on the row. A missing
-        /// row does not.
+        /// row does not. The new mark is the first of the list's marks; the one after it is for
+        /// a step being profiled.
         /// </summary>
         public static bool IsNew(ListViewItem row)
         {
             if (row == null) return false;
             var list = row.ListView as MarkedListView;
-            return list != null && list.IsMarked != null && list.IsMarked(row);
+            return list != null && list.Marks.Count > 0 && list.Marks[0].Applies(row);
         }
 
         /// <summary>The id behind a named assembly row, for reading the fetch cache against it.</summary>

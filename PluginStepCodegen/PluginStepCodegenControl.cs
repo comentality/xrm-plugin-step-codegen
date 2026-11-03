@@ -119,6 +119,7 @@ namespace PluginStepCodegen
         /// than shipped, so it is the list's own colour at the list's own size.
         /// </summary>
         private Bitmap _newMark;
+        private Bitmap _profiledMark;
         private readonly Font _codeFont = new Font("Consolas", 9f);
         /// <summary>A size up from the toolbar's own, so the dagger reads as a mark rather than a speck.</summary>
         private readonly Font _daggerFont = new Font("Segoe UI", 11f);
@@ -374,13 +375,17 @@ namespace PluginStepCodegen
             // so it scales with the font rather than sitting as a 16px speck on a large display.
             // Seven tenths of the line: a badge beside the name rather than a letter of it.
             _newMark = DrawNewMark((int)Math.Round(_listFont.Height * 0.7), GlyphGreen);
+            _profiledMark = DrawProfiledMark((int)Math.Round(_listFont.Height * 0.7), GlyphAmber);
 
             // Checked, not selected: a project that ships one assembly per plugin needs all of them
             // documented in one pass, so the list is a set rather than a pointer at one row.
             _lvAssemblies = new MarkedListView
             {
-                Mark = _newMark,
-                IsMarked = item => _newAssemblies.Contains(((AssemblyInfo)item.Tag).Id),
+                Marks =
+                {
+                    new RowMark { Image = _newMark, Applies = item => _newAssemblies.Contains(((AssemblyInfo)item.Tag).Id) },
+                    new RowMark { Image = _profiledMark, Applies = item => ProfiledSteps((AssemblyInfo)item.Tag).Count > 0 }
+                },
                 Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
@@ -431,8 +436,11 @@ namespace PluginStepCodegen
 
             _lvTypes = new MarkedListView
             {
-                Mark = _newMark,
-                IsMarked = item => _newTypes.Contains(((PluginTypeInfo)item.Tag).Id),
+                Marks =
+                {
+                    new RowMark { Image = _newMark, Applies = item => _newTypes.Contains(((PluginTypeInfo)item.Tag).Id) },
+                    new RowMark { Image = _profiledMark, Applies = item => ((PluginTypeInfo)item.Tag).Steps.Any(s => s.IsProfiled) }
+                },
                 Dock = DockStyle.Fill,
                 View = View.Details,
                 FullRowSelect = true,
@@ -783,6 +791,7 @@ namespace PluginStepCodegen
                 _listFont.Dispose();
                 _codeFont.Dispose();
                 if (_newMark != null) _newMark.Dispose();
+                if (_profiledMark != null) _profiledMark.Dispose();
                 _daggerFont.Dispose();
                 // A ContextMenuStrip belongs to no Controls collection, so nothing else frees it.
                 if (_experimentalMenu != null) _experimentalMenu.Dispose();
@@ -1169,6 +1178,69 @@ namespace PluginStepCodegen
         }
 
         private const string NewNote = "New since you last had this environment open.";
+
+        /// <summary>
+        /// The mark after the name of a class with a step being profiled: a beetle seen from
+        /// above - a round body split down the back, a head with two feelers, three legs a side - because
+        /// a profiler is a debugger and a bug is what everybody draws for one. Amber, the colour
+        /// of "worth a look" elsewhere in the tool, rather than red: nothing is wrong, somebody
+        /// is debugging and may have forgotten to stop.
+        /// </summary>
+        private static Bitmap DrawProfiledMark(int size, Color color)
+        {
+            var bitmap = new Bitmap(size, size);
+            using (var g = Graphics.FromImage(bitmap))
+            using (var fill = new SolidBrush(color))
+            using (var leg = new Pen(color, Math.Max(1f, size / 14f)))
+            using (var seam = new Pen(Color.White, Math.Max(1f, size / 12f)))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                leg.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                leg.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+
+                float s = size;
+                // Legs and feelers first, so the body covers where they join it.
+                foreach (var y in new[] { 0.42f, 0.62f, 0.82f })
+                {
+                    var slant = (y - 0.62f) * 0.5f;
+                    g.DrawLine(leg, s * 0.5f, s * y, s * 0.06f, s * (y + slant));
+                    g.DrawLine(leg, s * 0.5f, s * y, s * 0.94f, s * (y + slant));
+                }
+
+                g.DrawLine(leg, s * 0.42f, s * 0.14f, s * 0.26f, s * 0.0f);
+                g.DrawLine(leg, s * 0.58f, s * 0.14f, s * 0.74f, s * 0.0f);
+                g.FillEllipse(fill, s * 0.34f, s * 0.1f, s * 0.32f, s * 0.24f);
+                g.FillEllipse(fill, s * 0.2f, s * 0.26f, s * 0.6f, s * 0.7f);
+                g.DrawLine(seam, s * 0.5f, s * 0.34f, s * 0.5f, s * 0.9f);
+            }
+
+            return bitmap;
+        }
+
+        /// <summary>The steps of an assembly's fetched classes that are being profiled.</summary>
+        private List<PluginStepInfo> ProfiledSteps(AssemblyInfo assembly)
+        {
+            List<PluginTypeInfo> types;
+            return _typesByAssembly.TryGetValue(assembly.Id, out types)
+                ? types.SelectMany(t => t.Steps).Where(s => s.IsProfiled).ToList()
+                : new List<PluginStepInfo>();
+        }
+
+        /// <summary>
+        /// The tooltip line for a class or assembly with steps being profiled: which ones, that
+        /// what is written does not change, and where to stop it.
+        /// </summary>
+        private static string ProfiledNote(IList<PluginStepInfo> steps)
+        {
+            if (steps.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var which = string.Join(", ", steps.Select(s => s.HasEntity ? s.MessageName + " of " + s.PrimaryEntityName : s.MessageName));
+            return "\r\nBeing profiled in the Plugin Registration Tool: " + which + "."
+                   + "\r\nDocumented as registered. Stop profiling there when you are done.";
+        }
 
         private void BtnRefresh_Click(object sender, EventArgs e)
         {
@@ -1680,6 +1752,10 @@ namespace PluginStepCodegen
 
             var hidden = chosen - shownAndChecked;
 
+            // Among the classes listed, so every step counted is behind a mark a scroll would find.
+            var profiled = _lvTypes.Items.Cast<ListViewItem>()
+                .Sum(i => ((PluginTypeInfo)i.Tag).Steps.Count(s => s.IsProfiled));
+
             // The count of classes is a count of what has arrived, and says so while any of it is
             // still on its way: "3 assemblies · 5 of 5 classes" is a complete-sounding sentence
             // about a list with two assemblies missing from it.
@@ -1688,7 +1764,8 @@ namespace PluginStepCodegen
                 + (_typesInFlight.Count == 0 ? string.Empty : " · " + _typesInFlight.Count + " still loading")
                 + (hidden == 0 ? string.Empty : " · " + hidden + " out of view")
                 + (fresh == 0 ? string.Empty : " · " + fresh + " new")
-                + (empty == 0 ? string.Empty : " · " + empty + " with no steps");
+                + (empty == 0 ? string.Empty : " · " + empty + " with no steps")
+                + (profiled == 0 ? string.Empty : " · " + profiled + (profiled == 1 ? " step" : " steps") + " being profiled");
         }
 
         /// <summary>
@@ -2016,7 +2093,8 @@ namespace PluginStepCodegen
                 cell.Text = glyph.Length == 0 ? string.Empty : glyph + " " + words;
                 cell.ForeColor = color;
                 item.ToolTipText = (detail == null ? type.TypeName : type.TypeName + "\r\n" + detail)
-                    + (_newTypes.Contains(type.Id) ? "\r\n" + NewNote : string.Empty);
+                    + (_newTypes.Contains(type.Id) ? "\r\n" + NewNote : string.Empty)
+                    + ProfiledNote(type.Steps.Where(s => s.IsProfiled).ToList());
             }
 
             _lvTypes.EndUpdate();
@@ -2180,7 +2258,8 @@ namespace PluginStepCodegen
         {
             return state
                    + (assembly.IsolationMode == 2 ? string.Empty : "\r\nRegistered outside the sandbox, in full trust.")
-                   + (_newAssemblies.Contains(assembly.Id) ? "\r\n" + NewNote : string.Empty);
+                   + (_newAssemblies.Contains(assembly.Id) ? "\r\n" + NewNote : string.Empty)
+                   + ProfiledNote(ProfiledSteps(assembly));
         }
 
         /// <summary>

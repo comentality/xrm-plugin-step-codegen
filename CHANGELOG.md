@@ -10,6 +10,14 @@
   name, its images and its real on/off state, and the profiler's stand-ins are no longer
   listed as steps of the profiler. Finding them costs no extra round trip.
 
+- **A class with a step being profiled wears a small amber bug, so a forgotten profiling
+  session is hard to miss.** Profiling leaves the real step switched off until somebody presses
+  Stop Profiling. The bug shows after the class name and after its assembly; the row's
+  tooltip names the steps, and the status line counts them. Only the window shows it.
+  Nothing written to your files mentions profiling.
+
+  ![An assembly with a step being profiled](assets/changelog-profiled-mark.png)
+
 - `tests\profile.ps1` profiles every step of the end to end fixture with the Plugin
   Registration Tool's own profiler library, reads the fixture before, during and after, and
   fails unless all three readings are identical down to every emitted line.

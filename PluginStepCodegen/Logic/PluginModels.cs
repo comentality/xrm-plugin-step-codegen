@@ -136,6 +136,12 @@ namespace PluginStepCodegen.Logic
         public bool AsyncAutoDelete;
         /// <summary>statecode 1. Documented in the comment only; no attribute can carry it.</summary>
         public bool IsDisabled;
+        /// <summary>
+        /// Being profiled in the Plugin Registration Tool right now. Every other field already
+        /// reads as the step was before profiling, so neither emitter looks at this: it is for
+        /// the window, as a reminder that somebody's debugging session is still running.
+        /// </summary>
+        public bool IsProfiled;
         /// <summary>Full name behind impersonatinguserid, empty when the step runs as the calling user.</summary>
         public string ImpersonatingUser;
         public List<PluginImageInfo> Images = new List<PluginImageInfo>();

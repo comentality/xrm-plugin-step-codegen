@@ -400,7 +400,9 @@ holds it to "exactly as if it were not profiled":
    It then checks on the wire that every profiled step really did come back disabled and
    renamed, so a profiler that quietly did nothing cannot pass. The three steps the matrix
    leaves disabled cannot be profiled and are read as disabled throughout.
-4. Reads again, and the rendering has to match step 1 character for character. Then once more
+4. Reads again, and the rendering has to match step 1 character for character. The one field
+   left out of the rendering, the flag the window's bug mark reads, has to be set on exactly the
+   profiled steps, and on none before or after. Then once more
    with the profiler's own assembly in the batch, where `ProfilerPlugin` must have no steps.
 5. Stops profiling with the registration tool's `DisablePlugin` and reads a third time.
 

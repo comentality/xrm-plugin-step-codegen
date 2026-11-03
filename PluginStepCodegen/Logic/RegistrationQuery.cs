@@ -123,6 +123,7 @@ namespace PluginStepCodegen.Logic
 
                 profiled.Name = standIn.ProfiledStepName ?? Unprofiled(profiled.Name);
                 profiled.IsDisabled = standIn.Step.IsDisabled;
+                profiled.IsProfiled = true;
                 imageOwners[standIn.Step.Id] = profiled;
             }
 

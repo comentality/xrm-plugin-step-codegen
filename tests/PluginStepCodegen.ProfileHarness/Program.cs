@@ -96,7 +96,9 @@ namespace PluginStepCodegen.ProfileHarness
                 StopProfiling(client, leftovers);
             }
 
-            var baseline = Render(RegistrationQuery.GetPluginTypes(client, fixtureIds), true);
+            var baselineFetch = RegistrationQuery.GetPluginTypes(client, fixtureIds);
+            CheckFlagged("unprofiled", baselineFetch, new HashSet<Guid>());
+            var baseline = Render(baselineFetch, true);
             File.WriteAllText(Path.Combine(output, "baseline.txt"), baseline);
 
             Console.WriteLine("Making sure the profiler is installed (an import, the first time).");
@@ -109,6 +111,7 @@ namespace PluginStepCodegen.ProfileHarness
             }
 
             var profiled = new List<Guid>();
+            var originals = new HashSet<Guid>();
             try
             {
                 foreach (var step in FixtureSteps(client, fixtureIds, true))
@@ -116,6 +119,7 @@ namespace PluginStepCodegen.ProfileHarness
                     try
                     {
                         profiled.Add(ProfilerManagementUtility.EnablePlugin(client, step.Id));
+                        originals.Add(step.Id);
                     }
                     catch (Exception ex)
                     {
@@ -126,7 +130,9 @@ namespace PluginStepCodegen.ProfileHarness
                 Console.WriteLine("Profiled " + profiled.Count + " step(s).");
                 CheckTheWire(client, fixtureIds, profiled.Count);
 
-                var afterProfiling = Render(RegistrationQuery.GetPluginTypes(client, fixtureIds), true);
+                var profiledFetch = RegistrationQuery.GetPluginTypes(client, fixtureIds);
+                CheckFlagged("profiled", profiledFetch, originals);
+                var afterProfiling = Render(profiledFetch, true);
                 File.WriteAllText(Path.Combine(output, "profiled.txt"), afterProfiling);
                 Compare("profiled", baseline, afterProfiling);
 
@@ -154,7 +160,9 @@ namespace PluginStepCodegen.ProfileHarness
                 StopProfiling(client, profiled);
             }
 
-            var restored = Render(RegistrationQuery.GetPluginTypes(client, fixtureIds), true);
+            var restoredFetch = RegistrationQuery.GetPluginTypes(client, fixtureIds);
+            CheckFlagged("profiling stopped", restoredFetch, new HashSet<Guid>());
+            var restored = Render(restoredFetch, true);
             File.WriteAllText(Path.Combine(output, "restored.txt"), restored);
             Compare("profiling stopped", baseline, restored);
         }
@@ -274,6 +282,24 @@ namespace PluginStepCodegen.ProfileHarness
             images.Criteria.AddCondition("sdkmessageprocessingstepid", ConditionOperator.In, steps.Select(s => (object)s.Id).ToArray());
             var left = service.RetrieveMultiple(images).Entities.Count;
             Console.WriteLine("Images still on the fixture's own steps while profiled: " + left + ".");
+        }
+
+        /// <summary>
+        /// The one thing that is allowed to differ, and is kept out of <see cref="Render"/> for
+        /// that reason: the window marks a step being profiled, so the flag has to be on exactly
+        /// the steps that were profiled, and on none of them once profiling has stopped.
+        /// </summary>
+        private static void CheckFlagged(string what, TypeFetch fetch, HashSet<Guid> expected)
+        {
+            var flagged = new HashSet<Guid>(fetch.Types.SelectMany(t => t.Steps).Where(s => s.IsProfiled).Select(s => s.Id));
+            if (flagged.SetEquals(expected))
+            {
+                Console.WriteLine("  ok    " + what + " - " + flagged.Count + " step(s) marked as being profiled");
+                return;
+            }
+
+            Findings.Add(what + ": " + flagged.Count + " step(s) marked as being profiled, expected " + expected.Count
+                + " (" + flagged.Except(expected).Count() + " wrongly, " + expected.Except(flagged).Count() + " missed)");
         }
 
         private static void Compare(string what, string expected, string actual)
