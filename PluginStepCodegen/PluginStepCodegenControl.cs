@@ -203,6 +203,14 @@ namespace PluginStepCodegen
 
         private bool _fitPending;
 
+        /// <summary>
+        /// What each list held when it was last measured. Most fits follow a render that put the
+        /// same rows back, and a resize changes no content at all; measuring repaints the list,
+        /// and on a busy machine that is long enough to make a click land late.
+        /// </summary>
+        private readonly Dictionary<ListView, KeyValuePair<string, int>> _measuredContent = new Dictionary<ListView, KeyValuePair<string, int>>();
+        private bool _previewChanged = true;
+
         /// <summary>The splitter is being dragged by hand, as opposed to moved by a fit or a resize.</summary>
         private bool _draggingLeft;
         private bool _draggingSource;
@@ -743,7 +751,11 @@ namespace PluginStepCodegen
                 Font = _codeFont
             };
             // Clear and then the new text: two changes, one fit, since RequestFit waits for both.
-            _txtPreview.TextChanged += (s, e) => RequestFit();
+            _txtPreview.TextChanged += (s, e) =>
+            {
+                _previewChanged = true;
+                RequestFit();
+            };
 
             _rightSplit.Panel2.Controls.Add(_txtPreview);
             _mainSplit.Panel2.Controls.Add(_rightSplit);
@@ -965,6 +977,54 @@ namespace PluginStepCodegen
         /// </summary>
         private int MeasureList(ListView list)
         {
+            var content = ContentOf(list);
+            KeyValuePair<string, int> measured;
+            if (_measuredContent.TryGetValue(list, out measured) && measured.Key == content)
+            {
+                return measured.Value;
+            }
+
+            var width = MeasureColumns(list);
+            _measuredContent[list] = new KeyValuePair<string, int>(content, width);
+            return width;
+        }
+
+        /// <summary>
+        /// Every line the list shows, and which rows wear which mark, as one string: equal
+        /// strings measure the same.
+        /// </summary>
+        private static string ContentOf(ListView list)
+        {
+            var sb = new StringBuilder();
+            var marked = list as MarkedListView;
+            foreach (ListViewGroup group in list.Groups)
+            {
+                sb.Append(group.Items.Count == 0 ? string.Empty : group.Header).Append('\u0001');
+            }
+
+            foreach (ListViewItem item in list.Items)
+            {
+                foreach (ListViewItem.ListViewSubItem cell in item.SubItems)
+                {
+                    sb.Append(cell.Text).Append('\u0002');
+                }
+
+                if (marked != null)
+                {
+                    foreach (var mark in marked.Marks)
+                    {
+                        sb.Append(mark.Applies != null && mark.Applies(item) ? '+' : '-');
+                    }
+                }
+
+                sb.Append('\u0003');
+            }
+
+            return sb.ToString();
+        }
+
+        private int MeasureColumns(ListView list)
+        {
             var naturals = new int[list.Columns.Count];
             list.BeginUpdate();
             for (var i = 0; i < naturals.Length; i++)
@@ -1009,6 +1069,15 @@ namespace PluginStepCodegen
             }
 
             var first = Math.Min(naturals[0], Math.Max(list.ClientSize.Width - rest, FirstColumnFloor));
+
+            // Already laid out like this: setting the same widths again still repaints the list.
+            var same = list.Columns[0].Width == first;
+            for (var i = 1; same && i < naturals.Length; i++)
+            {
+                same = list.Columns[i].Width == naturals[i];
+            }
+
+            if (same) return;
 
             list.BeginUpdate();
             list.Columns[0].Width = first;
@@ -1063,7 +1132,11 @@ namespace PluginStepCodegen
 
             _leftNatural = Math.Max(MeasureList(_lvAssemblies), MeasureList(_lvTypes));
             _sourceNatural = MeasureList(_lvSource);
-            _previewNatural = MeasurePreview();
+            if (_previewChanged)
+            {
+                _previewChanged = false;
+                _previewNatural = MeasurePreview();
+            }
 
             var left = Math.Max(Math.Min(_leftNatural, _leftCap ?? int.MaxValue), _mainSplit.Panel1MinSize);
             var source = Math.Max(Math.Min(_sourceNatural, _sourceCap ?? int.MaxValue), _rightSplit.Panel1MinSize);
