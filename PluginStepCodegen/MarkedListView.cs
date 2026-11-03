@@ -40,6 +40,51 @@ namespace PluginStepCodegen
             }
         }
 
+        /// <summary>
+        /// How wide the first column has to be for every row's marks to fit after its name, or
+        /// 0 if no row wears one. A column sized to its text alone would leave the marks no room,
+        /// and <see cref="PaintMarks"/> leaves out a mark that does not fit rather than spill it.
+        /// </summary>
+        public int MarkedWidth()
+        {
+            var widest = 0;
+            if (Marks.Count == 0 || Columns.Count == 0 || !IsHandleCreated)
+            {
+                return widest;
+            }
+
+            foreach (ListViewItem item in Items)
+            {
+                var marks = 0;
+                var count = 0;
+                foreach (var mark in Marks)
+                {
+                    if (mark.Image == null || mark.Applies == null || !mark.Applies(item))
+                    {
+                        continue;
+                    }
+
+                    marks += mark.Image.Width;
+                    count++;
+                }
+
+                if (count == 0)
+                {
+                    continue;
+                }
+
+                var indent = item.GetBounds(ItemBoundsPortion.Label).Left - item.GetBounds(ItemBoundsPortion.Entire).Left;
+                var text = TextRenderer.MeasureText(item.Text, item.Font, new Size(int.MaxValue, int.MaxValue),
+                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+
+                // The same arithmetic PaintMarks lays them out by: two pixels before the glyphs,
+                // one between marks, and two clear of the cell's edge after the last.
+                widest = Math.Max(widest, indent + 2 + text + marks + (count - 1) + 2);
+            }
+
+            return widest;
+        }
+
         private void PaintMarks()
         {
             var client = ClientRectangle;

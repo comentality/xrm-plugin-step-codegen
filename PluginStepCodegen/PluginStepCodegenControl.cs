@@ -182,6 +182,31 @@ namespace PluginStepCodegen
         /// <summary>Bumped whenever a scan starts, so a slow one landing late is thrown away.</summary>
         private int _scanGeneration;
 
+        /// <summary>
+        /// The width each list's columns take to show their widest line, from the last fit. A
+        /// column is never laid out wider than this, nor dragged past it.
+        /// </summary>
+        private readonly Dictionary<ListView, int[]> _columnNaturals = new Dictionary<ListView, int[]>();
+
+        /// <summary>What each pane needs to show its widest line, from the last fit.</summary>
+        private int _leftNatural;
+        private int _sourceNatural;
+        private int _previewNatural;
+
+        /// <summary>
+        /// A pane somebody dragged narrower than its content. Kept across fits, because the panes
+        /// are refitted on every render and a drag undone by the next tick is no drag at all;
+        /// dragging it back out to its content forgets it.
+        /// </summary>
+        private int? _leftCap;
+        private int? _sourceCap;
+
+        private bool _fitPending;
+
+        /// <summary>The splitter is being dragged by hand, as opposed to moved by a fit or a resize.</summary>
+        private bool _draggingLeft;
+        private bool _draggingSource;
+
         /// <summary>Set while one list's selection is being echoed into the other.</summary>
         private bool _syncingSelection;
 
@@ -403,10 +428,7 @@ namespace PluginStepCodegen
             // left a quarter of the pane reading "Sandbox" all the way down. The rare answer is
             // worth having, and the row's tooltip is where it now lives.
             _lvAssemblies.Columns.Add("Source");
-            // The floor sits just under what the pane's own minimum leaves once a scrollbar has
-            // taken its share, so the fallback to sideways scrolling is reserved for a pane
-            // narrower than the splitter will allow.
-            ShareWidthBetweenColumns(_lvAssemblies, 230, 0.55f, 0.45f);
+            HugContent(_lvAssemblies);
             _lvAssemblies.ItemChecked += LvAssemblies_ItemChecked;
 
             _checkSettled = new Timer { Interval = 120 };
@@ -455,7 +477,7 @@ namespace PluginStepCodegen
             _lvTypes.Columns.Add("Plugin Class");
             _lvTypes.Columns.Add("Steps", -1, HorizontalAlignment.Right);
             _lvTypes.Columns.Add("Source");
-            ShareWidthBetweenColumns(_lvTypes, 230, 0.62f, 0.16f, 0.22f);
+            HugContent(_lvTypes);
             _lvTypes.ItemChecked += LvTypes_ItemChecked;
             _lvTypes.ItemSelectionChanged += LvTypes_ItemSelectionChanged;
 
@@ -555,7 +577,7 @@ namespace PluginStepCodegen
             };
             _lvSource.Columns.Add("Local source");
             _lvSource.Columns.Add("State");
-            ShareWidthBetweenColumns(_lvSource, 210, 0.66f, 0.34f);
+            HugContent(_lvSource);
             _lvSource.ItemSelectionChanged += LvSource_ItemSelectionChanged;
 
             _rightSplit.Panel1.Controls.Add(_lvSource);
@@ -607,6 +629,7 @@ namespace PluginStepCodegen
                 var hide = !_rightSplit.Panel2Collapsed;
                 _rightSplit.Panel2Collapsed = hide;
                 _btnPreviewToggle.Text = hide ? "◂ Preview" : "Preview ▸";
+                RequestFit();
             };
 
             // The dagger: experimental settings, experiments running as opt-ins until they
@@ -719,6 +742,8 @@ namespace PluginStepCodegen
                 BackColor = Color.White,
                 Font = _codeFont
             };
+            // Clear and then the new text: two changes, one fit, since RequestFit waits for both.
+            _txtPreview.TextChanged += (s, e) => RequestFit();
 
             _rightSplit.Panel2.Controls.Add(_txtPreview);
             _mainSplit.Panel2.Controls.Add(_rightSplit);
@@ -727,6 +752,30 @@ namespace PluginStepCodegen
             EnableDoubleBuffer(_lvAssemblies);
             EnableDoubleBuffer(_lvTypes);
             EnableDoubleBuffer(_lvSource);
+
+            // Moving only fires for a hand on the splitter; Moved also fires for every fit and
+            // for the container's own adjustments on a resize, none of which are a choice.
+            _mainSplit.SplitterMoving += (s, e) => _draggingLeft = true;
+            _mainSplit.SplitterMoved += (s, e) =>
+            {
+                if (!_draggingLeft) return;
+                _draggingLeft = false;
+                var distance = _mainSplit.SplitterDistance;
+                _leftCap = distance < _leftNatural ? distance : (int?)null;
+                RequestFit();
+            };
+            _rightSplit.SplitterMoving += (s, e) => _draggingSource = true;
+            _rightSplit.SplitterMoved += (s, e) =>
+            {
+                if (!_draggingSource) return;
+                _draggingSource = false;
+                // Narrowing the source column widens the preview, and past its longest line
+                // that is width with nothing in it, so the drag stops where the preview is full.
+                var distance = Math.Max(_rightSplit.SplitterDistance,
+                    _rightSplit.Width - _rightSplit.SplitterWidth - _previewNatural);
+                _sourceCap = distance < _sourceNatural ? distance : (int?)null;
+                RequestFit();
+            };
 
             Controls.Add(_mainSplit);
             ResumeLayout(false);
@@ -803,13 +852,16 @@ namespace PluginStepCodegen
             base.OnLoad(e);
             LaySplitters();
             RenderPreview();
+            RequestFit();
         }
 
         protected override void OnSizeChanged(EventArgs e)
         {
             base.OnSizeChanged(e);
-            // Only until it takes: after that the splitters belong to whoever drags them.
-            if (!_splittersLaid && _mainSplit != null) LaySplitters();
+            if (_mainSplit == null) return;
+            if (!_splittersLaid) LaySplitters();
+            // The panes share the window by what they hold, so a different window is a new share.
+            if (_splittersLaid) RequestFit();
         }
 
         /// <summary>
@@ -821,10 +873,9 @@ namespace PluginStepCodegen
         /// </summary>
         private void LaySplitters()
         {
-            // 420 is what the load row measures: both buttons, both switches with their counts
-            // spelled out, and the margins between them. A share of the window was the rule before
-            // there were two switches, and it put the second one on a line of its own on any window
-            // narrower than about 1250. Below the floor the row wraps rather than being clipped.
+            // The distances are only where the panes open; FitPanes moves them to what the lists
+            // and the preview hold as soon as there is anything to measure. A left pane narrower
+            // than the load row's 420 wraps the row rather than clipping it.
             // The right side's minimum has to cover the other two panes at their own minimums, or
             // the inner splitter is never laid at all.
             _splittersLaid =
@@ -848,34 +899,221 @@ namespace PluginStepCodegen
             return true;
         }
 
+        /// <summary>Header text sits between the divider and a little padding either side.</summary>
+        private const int HeaderPad = 12;
+
+        /// <summary>A group heading starts indented and trails a rule; this is room for both.</summary>
+        private const int GroupHeadingPad = 24;
+
+        /// <summary>Below this the first column's text is all ellipsis, so the list scrolls instead.</summary>
+        private const int FirstColumnFloor = 60;
+
         /// <summary>
-        /// List columns are plain pixel widths, so a list narrower than their sum scrolls sideways
-        /// and a wider one leaves dead space past the last column. Give each column a share of the
-        /// list instead and redistribute it whenever the list is resized. Below
-        /// <paramref name="minTotal"/> the shares would ellipsise every cell down to nothing, so
-        /// the columns stop shrinking there and the list scrolls sideways as before.
+        /// A list's border, and its vertical scrollbar whether it is showing yet or not: reserved
+        /// up front, the scrollbar arriving with the twentieth row does not push a path into an
+        /// ellipsis or the list into scrolling sideways.
         /// </summary>
-        private static void ShareWidthBetweenColumns(ListView list, int minTotal, params float[] shares)
+        private static int ListChrome
         {
-            EventHandler apply = (s, e) =>
+            get { return 4 + SystemInformation.VerticalScrollBarWidth; }
+        }
+
+        /// <summary>
+        /// The RichTextBox's border, its vertical scrollbar, and the few pixels of margin it keeps
+        /// either side of the text, so the longest line does not summon a horizontal scrollbar.
+        /// </summary>
+        private static int PreviewChrome
+        {
+            get { return 4 + SystemInformation.VerticalScrollBarWidth + 8; }
+        }
+
+        /// <summary>
+        /// Columns as wide as their widest line and no wider. Every column but the first is
+        /// exactly its content; the first - the assembly, the class, the local path, the ones
+        /// that run long - takes what the list has left, up to its own content and never past it.
+        /// A divider dragged by hand stops at the same line.
+        /// </summary>
+        private void HugContent(ListView list)
+        {
+            list.ClientSizeChanged += (s, e) => SpreadColumns(list);
+            list.ColumnWidthChanging += (s, e) =>
             {
-                var available = Math.Max(list.ClientSize.Width - 4, minTotal);
-                if (available <= 0) return;
+                int[] naturals;
+                if (!_columnNaturals.TryGetValue(list, out naturals) || e.ColumnIndex >= naturals.Length) return;
 
-                list.BeginUpdate();
-                var used = 0;
-                for (var i = 0; i < list.Columns.Count; i++)
+                var natural = naturals[e.ColumnIndex];
+                if (e.NewWidth <= natural) return;
+
+                e.Cancel = true;
+                // A cancelled move leaves the divider at the last one allowed, which a quick drag
+                // leaves short of the line; this puts it on the line.
+                var column = list.Columns[e.ColumnIndex];
+                if (column.Width < natural)
                 {
-                    // The last column absorbs the rounding so the widths always add up exactly.
-                    var width = i == list.Columns.Count - 1 ? available - used : (int)(available * shares[i]);
-                    list.Columns[i].Width = width;
-                    used += width;
+                    list.BeginInvoke((Action)(() =>
+                    {
+                        if (!list.IsDisposed) column.Width = natural;
+                    }));
                 }
-                list.EndUpdate();
             };
+        }
 
-            list.ClientSizeChanged += apply;
-            apply(list, EventArgs.Empty);
+        /// <summary>
+        /// What each column needs for its widest cell or its header, whichever is wider, kept
+        /// for <see cref="SpreadColumns"/>; and what the whole list needs to show them all
+        /// without scrolling sideways. A group heading is a line of its own and counts too.
+        /// </summary>
+        private int MeasureList(ListView list)
+        {
+            var naturals = new int[list.Columns.Count];
+            list.BeginUpdate();
+            for (var i = 0; i < naturals.Length; i++)
+            {
+                list.AutoResizeColumn(i, ColumnHeaderAutoResizeStyle.ColumnContent);
+                var content = list.Items.Count == 0 ? 0 : list.Columns[i].Width;
+                var header = TextRenderer.MeasureText(list.Columns[i].Text, list.Font).Width + HeaderPad;
+                naturals[i] = Math.Max(content, header);
+            }
+
+            // The marks are painted after the name, so the control's own measure leaves them out.
+            var marked = list as MarkedListView;
+            if (marked != null && naturals.Length > 0)
+            {
+                naturals[0] = Math.Max(naturals[0], marked.MarkedWidth());
+            }
+
+            _columnNaturals[list] = naturals;
+            SpreadColumns(list);
+            list.EndUpdate();
+
+            var width = naturals.Sum();
+            foreach (ListViewGroup group in list.Groups)
+            {
+                // An empty group draws nothing, heading included.
+                if (group.Items.Count == 0) continue;
+                width = Math.Max(width, TextRenderer.MeasureText(group.Header, list.Font).Width + GroupHeadingPad);
+            }
+
+            return width + ListChrome;
+        }
+
+        private void SpreadColumns(ListView list)
+        {
+            int[] naturals;
+            if (!_columnNaturals.TryGetValue(list, out naturals) || naturals.Length != list.Columns.Count) return;
+
+            var rest = 0;
+            for (var i = 1; i < naturals.Length; i++)
+            {
+                rest += naturals[i];
+            }
+
+            var first = Math.Min(naturals[0], Math.Max(list.ClientSize.Width - rest, FirstColumnFloor));
+
+            list.BeginUpdate();
+            list.Columns[0].Width = first;
+            for (var i = 1; i < naturals.Length; i++)
+            {
+                list.Columns[i].Width = naturals[i];
+            }
+            list.EndUpdate();
+        }
+
+        /// <summary>The preview's longest line, and what the box around it adds.</summary>
+        private int MeasurePreview()
+        {
+            // Consolas is monospaced, so the line with the most characters is the widest.
+            var longest = string.Empty;
+            foreach (var line in _txtPreview.Lines)
+            {
+                if (line.Length > longest.Length) longest = line;
+            }
+
+            return TextRenderer.MeasureText(longest, _codeFont, new Size(int.MaxValue, int.MaxValue),
+                TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width + PreviewChrome;
+        }
+
+        /// <summary>
+        /// Refits the panes once the current message is done with. One tick re-renders the lists
+        /// and the preview in turn, and each asks; measuring three lists once is plenty.
+        /// </summary>
+        private void RequestFit()
+        {
+            if (_fitPending || !_splittersLaid || !IsHandleCreated || IsDisposed) return;
+
+            _fitPending = true;
+            BeginInvoke((Action)(() =>
+            {
+                _fitPending = false;
+                if (!IsDisposed) FitPanes();
+            }));
+        }
+
+        /// <summary>
+        /// Sizes each pane to its widest line. The preview keeps that, or a third of the window
+        /// if its longest line wants more; the assemblies and the source column - the long names
+        /// and paths that are the reason the panes are fitted at all - share what is left, each
+        /// getting its content if there is room and giving up width in proportion to how much it
+        /// has above its minimum if there is not. Whatever is left after every pane has its
+        /// content goes to the preview, where it is white space beside the code rather than a gap.
+        /// </summary>
+        private void FitPanes()
+        {
+            if (!_splittersLaid) return;
+
+            _leftNatural = Math.Max(MeasureList(_lvAssemblies), MeasureList(_lvTypes));
+            _sourceNatural = MeasureList(_lvSource);
+            _previewNatural = MeasurePreview();
+
+            var left = Math.Max(Math.Min(_leftNatural, _leftCap ?? int.MaxValue), _mainSplit.Panel1MinSize);
+            var source = Math.Max(Math.Min(_sourceNatural, _sourceCap ?? int.MaxValue), _rightSplit.Panel1MinSize);
+
+            var previewShown = !_rightSplit.Panel2Collapsed;
+            var room = _mainSplit.Width - _mainSplit.SplitterWidth;
+            if (previewShown)
+            {
+                room -= _rightSplit.SplitterWidth;
+                room -= Math.Max(_rightSplit.Panel2MinSize, Math.Min(_previewNatural, room / 3));
+            }
+
+            var over = left + source - room;
+            if (over > 0)
+            {
+                var spareLeft = left - _mainSplit.Panel1MinSize;
+                var spareSource = source - _rightSplit.Panel1MinSize;
+                if (spareLeft + spareSource <= over)
+                {
+                    left -= spareLeft;
+                    source -= spareSource;
+                }
+                else
+                {
+                    var fromLeft = (int)((long)over * spareLeft / (spareLeft + spareSource));
+                    left -= fromLeft;
+                    source -= over - fromLeft;
+                }
+            }
+
+            SetDistance(_mainSplit, left);
+            // Collapsed, the source column is the whole of the right side and has no splitter;
+            // the fit that follows the preview coming back sets it.
+            if (previewShown) SetDistance(_rightSplit, source);
+
+            // A list whose size did not change raises no resize, but its content may have.
+            SpreadColumns(_lvAssemblies);
+            SpreadColumns(_lvTypes);
+            SpreadColumns(_lvSource);
+        }
+
+        /// <summary>The distance, kept inside what the panes' minimums allow, where the setter would throw.</summary>
+        private static void SetDistance(SplitContainer split, int distance)
+        {
+            var span = split.Orientation == Orientation.Vertical ? split.Width : split.Height;
+            var most = span - split.Panel2MinSize - split.SplitterWidth;
+            if (most < split.Panel1MinSize) return;
+
+            distance = Math.Min(Math.Max(distance, split.Panel1MinSize), most);
+            if (split.SplitterDistance != distance) split.SplitterDistance = distance;
         }
 
         private void BtnLoadAssemblies_Click(object sender, EventArgs e)
@@ -1622,6 +1860,7 @@ namespace PluginStepCodegen
 
             _lvTypes.EndUpdate();
             _rendering = false;
+            RequestFit();
 
             UpdateButtonState();
             StartScan();
@@ -2247,6 +2486,8 @@ namespace PluginStepCodegen
                 item.ToolTipText = RowNote(assembly, found + " of " + types.Count + " classes matched to a file"
                     + (trouble.Count == 0 ? "." : " · " + string.Join(" · ", trouble)));
             }
+
+            RequestFit();
         }
 
         /// <summary>
@@ -2399,6 +2640,7 @@ namespace PluginStepCodegen
             }
 
             _lvSource.EndUpdate();
+            RequestFit();
         }
 
         /// <summary>The middle column's status line, or the reason there is nothing to say.</summary>
