@@ -1,6 +1,6 @@
 ﻿# Changelog
 
-## Unreleased
+## 1.4.0
 
 - **A step you are profiling is documented exactly as registered, not as a disabled step
   called "(Profiled)".** Start Profiling in the Plugin Registration Tool renames the step,
