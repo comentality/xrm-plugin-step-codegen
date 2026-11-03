@@ -1,5 +1,7 @@
 ﻿# Changelog
 
+## Unreleased
+
 ## 1.4.0
 
 - **A step you are profiling is documented exactly as registered, not as a disabled step
