@@ -40,7 +40,7 @@ if (-not $OutputDir) {
 # because the control greys its buttons out and says so for a folder that does not - which is the
 # right render, and the wrong screenshot. When created here it is created empty, and the harness
 # then seeds it with sample source files for the scan column; it is removed again below.
-$docsFolder = "C:\src\Contoso.Plugins\Plugins"
+$docsFolder = "C:\src\Contoso.Crm"
 
 if (-not $NoBuild) {
     dotnet build $project -c Debug -v q --nologo

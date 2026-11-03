@@ -63,12 +63,12 @@ preview is replaced by a report of what happened:
 
 ```
 // Updated (6)
-//   AccountPreValidation
-//   AccountNumberGenerator
+//   AccountPreValidationPlugin
+//   AccountNumberGeneratorPlugin
 //   ...
 
 // Already up to date (1)
-//   ErpOrderSync
+//   ErpOrderSyncPlugin
 ```
 
 Files are rewritten in place, with no backup copy: review the change in your source

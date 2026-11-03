@@ -20,9 +20,9 @@ namespace PluginStepCodegen.SlowHarness
     /// </summary>
     public static class Scenarios
     {
-        private const string Contoso = "Contoso.Plugins";
-        private const string Integration = "Contoso.Integration.Plugins";
-        private const string Fabrikam = "Fabrikam.Shared.Plugins";
+        private const string Contoso = "Contoso.Crm.Sales.Plugins";
+        private const string Integration = "Contoso.Crm.Integration.ErpConnector.Plugins";
+        private const string Fabrikam = "Fabrikam.Dynamics.Shared.Common.Plugins";
 
         /// <summary>
         /// A link where one kind of question is slow and the rest are merely remote. Latency is
@@ -68,7 +68,7 @@ namespace PluginStepCodegen.SlowHarness
         private static Scenario Memory()
         {
             const string Environment = "slow-harness-memory";
-            const string Late = "Contoso.Late.Plugins";
+            const string Late = "Contoso.Crm.LateArrivals.Plugins";
 
             return new Scenario
             {
@@ -82,12 +82,12 @@ namespace PluginStepCodegen.SlowHarness
                     r.Probe.TypeFolder(r.Folder);
                 })
                 .At(100, "press Load", r => r.Probe.PressLoad())
-                .At(600, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
-                .At(2000, "untick AccountNumberGenerator", r =>
+                .At(600, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
+                .At(2000, "untick AccountNumberGeneratorPlugin", r =>
                 {
-                    r.Check(r.Probe.ClassRow("AccountNumberGenerator") != null,
+                    r.Check(r.Probe.ClassRow("AccountNumberGeneratorPlugin") != null,
                         "the class list should have Contoso's classes by now");
-                    r.Probe.TickClass("AccountNumberGenerator", false);
+                    r.Probe.TickClass("AccountNumberGeneratorPlugin", false);
                 })
                 .At(2500, "close the tab", r =>
                 {
@@ -98,14 +98,14 @@ namespace PluginStepCodegen.SlowHarness
                 {
                     var contoso = r.Service.Assemblies.First(a => a.Name == Contoso);
                     r.Service.Types[contoso.Id].Add(Sample.NewType(contoso,
-                        "Contoso.Plugins.Accounts.LateArrival",
+                        "Contoso.Crm.Sales.Plugins.Accounts.Onboarding.LateArrivalPlugin",
                         Sample.NewStep("Create", "account", 40, 0)));
 
                     var late = Sample.NewAssembly(Late, "a1b2c3d4e5f60718", 2);
                     r.Service.Assemblies.Add(late);
                     r.Service.Types[late.Id] = new List<PluginTypeInfo>
                     {
-                        Sample.NewType(late, "Contoso.Late.Plugins.Newcomer",
+                        Sample.NewType(late, "Contoso.Crm.LateArrivals.Plugins.Contacts.NewcomerPlugin",
                             Sample.NewStep("Update", "contact", 40, 0))
                     };
                 })
@@ -120,15 +120,15 @@ namespace PluginStepCodegen.SlowHarness
                     r.Check(string.Equals(r.Probe.Folder.Text, r.Folder, StringComparison.OrdinalIgnoreCase),
                         "the folder should be back in the box, and is \"" + r.Probe.Folder.Text + "\"");
 
-                    var unticked = r.Probe.ClassRow("AccountNumberGenerator");
-                    r.Check(unticked != null && !unticked.Checked, "AccountNumberGenerator should still be unticked");
-                    var ticked = r.Probe.ClassRow("AccountPreValidation");
-                    r.Check(ticked != null && ticked.Checked, "AccountPreValidation should still be ticked");
+                    var unticked = r.Probe.ClassRow("AccountNumberGeneratorPlugin");
+                    r.Check(unticked != null && !unticked.Checked, "AccountNumberGeneratorPlugin should still be unticked");
+                    var ticked = r.Probe.ClassRow("AccountPreValidationPlugin");
+                    r.Check(ticked != null && ticked.Checked, "AccountPreValidationPlugin should still be ticked");
 
                     r.Check(Probe.IsNew(r.Probe.Row(Late)), Late + " was not there last time and should be marked new");
                     r.Check(!Probe.IsNew(contoso), Contoso + " was there last time and should not be marked new");
-                    r.Check(Probe.IsNew(r.Probe.ClassRow("LateArrival")), "LateArrival was not there last time and should be marked new");
-                    r.Check(!Probe.IsNew(ticked), "AccountPreValidation was there last time and should not be marked new");
+                    r.Check(Probe.IsNew(r.Probe.ClassRow("LateArrivalPlugin")), "LateArrivalPlugin was not there last time and should be marked new");
+                    r.Check(!Probe.IsNew(ticked), "AccountPreValidationPlugin was there last time and should not be marked new");
 
                     var lateRow = r.Probe.Row(Late);
                     r.Check(lateRow != null && lateRow.ToolTipText.Contains("New since"),
@@ -204,13 +204,13 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(900, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
+                .At(900, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
                 .At(1500, "register a class from the IDE", r =>
                 {
                     var id = r.Probe.IdOf(Contoso);
                     var assembly = r.Service.Assemblies.First(a => a.Id == id);
                     r.Service.Types[id].Add(Sample.NewType(assembly,
-                        "Contoso.Plugins.Accounts.LateArrival",
+                        "Contoso.Crm.Sales.Plugins.Accounts.Onboarding.LateArrivalPlugin",
                         Sample.NewStep("Create", "account", 40, 0)));
                 })
                 .At(1700, "press Refresh", r => r.Probe.PressRefresh())
@@ -219,9 +219,9 @@ namespace PluginStepCodegen.SlowHarness
                     var id = r.Probe.IdOf(Contoso);
                     List<PluginTypeInfo> fetched;
                     r.Check(r.Probe.Fetched.TryGetValue(id, out fetched)
-                            && fetched.Any(t => t.ClassName == "LateArrival"),
+                            && fetched.Any(t => t.ClassName == "LateArrivalPlugin"),
                         "the refresh's own answer should be the one kept");
-                    r.Check(r.Probe.ClassNames().Contains("LateArrival"),
+                    r.Check(r.Probe.ClassNames().Contains("LateArrivalPlugin"),
                         "the class list should show what the refresh found");
                 });
         }
@@ -244,9 +244,9 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(800, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
-                .At(1400, "tick Contoso.Integration.Plugins", r => r.Probe.Tick(Integration))
-                .At(2000, "tick Fabrikam.Shared.Plugins", r => r.Probe.Tick(Fabrikam))
+                .At(800, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
+                .At(1400, "tick Contoso.Crm.Integration.ErpConnector.Plugins", r => r.Probe.Tick(Integration))
+                .At(2000, "tick Fabrikam.Dynamics.Shared.Common.Plugins", r => r.Probe.Tick(Fabrikam))
                 .At(10000, "count the round trips", r =>
                 {
                     var asked = r.Service.Log("plugintype").SelectMany(c => c.Ids).ToList();
@@ -280,7 +280,7 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(800, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
+                .At(800, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
                 .At(4500, "everything has landed", r =>
                     r.Check(r.Probe.Write.Enabled, "Write should be live once the list is complete"))
                 .At(4700, "tick a second assembly", r => r.Probe.Tick(Integration))
@@ -323,25 +323,25 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(800, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
-                .At(4200, "settled, and ErpOrderSync really is unregistered", r =>
+                .At(800, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
+                .At(4200, "settled, and ErpOrderSyncPlugin really is unregistered", r =>
                     r.Check(r.Probe.SourceRows("In folder, not registered")
-                            .Any(row => row.IndexOf("ErpOrderSync", StringComparison.OrdinalIgnoreCase) >= 0),
-                        "with only Contoso.Plugins fetched, ErpOrderSync is a genuine finding"))
+                            .Any(row => row.IndexOf("ErpOrderSyncPlugin", StringComparison.OrdinalIgnoreCase) >= 0),
+                        "with only Contoso.Crm.Sales.Plugins fetched, ErpOrderSyncPlugin is a genuine finding"))
                 .At(4400, "tick the assembly that registers it", r => r.Probe.Tick(Integration))
                 .At(5000, "while its answer is still out", r =>
                 {
                     r.Check(r.Probe.Status.IndexOf("loading", StringComparison.OrdinalIgnoreCase) >= 0,
                         "the status line should own up to the fetch, and says \"" + r.Probe.Status + "\"");
                     r.Check(!r.Probe.SourceRows("In folder, not registered")
-                            .Any(row => row.IndexOf("ErpOrderSync", StringComparison.OrdinalIgnoreCase) >= 0),
+                            .Any(row => row.IndexOf("ErpOrderSyncPlugin", StringComparison.OrdinalIgnoreCase) >= 0),
                         "nothing can be called unregistered while the assembly that registers it is loading");
                 })
                 .At(8500, "and once it lands", r =>
                 {
                     r.Check(r.Probe.SourceRows("Matched")
-                            .Any(row => row.IndexOf("ErpOrderSync", StringComparison.OrdinalIgnoreCase) >= 0),
-                        "ErpOrderSync should end up matched");
+                            .Any(row => row.IndexOf("ErpOrderSyncPlugin", StringComparison.OrdinalIgnoreCase) >= 0),
+                        "ErpOrderSyncPlugin should end up matched");
                     r.Check(r.Probe.Status.IndexOf("loading", StringComparison.OrdinalIgnoreCase) < 0,
                         "and the status line should stop saying it is waiting");
                 });
@@ -397,7 +397,7 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(800, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
+                .At(800, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
                 .At(1600, "give up", r => r.Probe.PressCancel())
                 .At(5500, "nothing more went out", r =>
                 {
@@ -445,7 +445,7 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(800, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
+                .At(800, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
                 .At(4000, "read what is left", r =>
                 {
                     r.Check(!r.Probe.Fetched.ContainsKey(r.Probe.IdOf(Contoso)),
@@ -527,7 +527,7 @@ namespace PluginStepCodegen.SlowHarness
             }
                 .At(0, "point at the folder", r => r.Probe.TypeFolder(r.Folder))
                 .At(200, "press Load", r => r.Probe.PressLoad())
-                .At(800, "tick Contoso.Plugins", r => r.Probe.Tick(Contoso))
+                .At(800, "tick Contoso.Crm.Sales.Plugins", r => r.Probe.Tick(Contoso))
                 .At(2500, "everything has landed", r =>
                     r.Check(r.Probe.Write.Enabled, "Write should be live"))
                 .At(2700, "the folder stops being a folder", r =>

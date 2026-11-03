@@ -23,14 +23,14 @@ namespace PluginStepCodegen.Harness
         {
             var own = new List<AssemblyInfo>
             {
-                NewAssembly("Contoso.Plugins", "a1b2c3d4e5f60718", 2),
-                NewAssembly("Contoso.Integration.Plugins", "a1b2c3d4e5f60718", 2),
+                NewAssembly("Contoso.Crm.Sales.Plugins", "a1b2c3d4e5f60718", 2),
+                NewAssembly("Contoso.Crm.Integration.ErpConnector.Plugins", "a1b2c3d4e5f60718", 2),
                 // Nothing registered against it, and outside the sandbox besides.
-                NewAssembly("Fabrikam.Shared.Plugins", "0f2c9a1b7d3e4655", 1),
-                NewAssembly("MsContoso.Extensions", "9d8c7b6a5e4f3021", 2),
+                NewAssembly("Fabrikam.Dynamics.Shared.Common.Plugins", "0f2c9a1b7d3e4655", 1),
+                NewAssembly("MsContoso.Crm.Extensions.Plugins", "9d8c7b6a5e4f3021", 2),
                 // An ISV's app: neither Microsoft's nor yours, and the reason the Managed switch
                 // needs a bucket of its own rather than being read off the signature.
-                NewAssembly("Northwind.Suite.Plugins", "4c5d6e7f80912a3b", 2, managed: true),
+                NewAssembly("Northwind.Traders.Suite.Plugins", "4c5d6e7f80912a3b", 2, managed: true),
             };
 
             // Enough of Microsoft's own to make the point the switch exists for: they outnumber
@@ -69,33 +69,34 @@ namespace PluginStepCodegen.Harness
         {
             switch (assembly.Name)
             {
-                case "Contoso.Plugins":
+                case "Contoso.Crm.Sales.Plugins":
                     return new List<PluginTypeInfo>
                     {
-                        NewType(assembly, "Contoso.Plugins.Accounts.AccountPreValidation", NewStep("Create", "account", 10, 0)),
-                        NewType(assembly, "Contoso.Plugins.Accounts.AccountNumberGenerator",
+                        NewType(assembly, "Contoso.Crm.Sales.Plugins.Accounts.PreValidation.AccountPreValidationPlugin",
+                            NewStep("Create", "account", 10, 0)),
+                        NewType(assembly, "Contoso.Crm.Sales.Plugins.Accounts.Numbering.AccountNumberGeneratorPlugin",
                             NewStep("Create", "account", 20, 0),
                             NewStep("Update", "account", 20, 0, "name,telephone1")),
-                        NewType(assembly, "Contoso.Plugins.Contacts.ContactDeduplication",
+                        NewType(assembly, "Contoso.Crm.Sales.Plugins.Contacts.Deduplication.ContactDeduplicationPlugin",
                             WithImage(NewStep("Create", "contact", 40, 0), "PostImage"),
                             NewStep("Update", "contact", 40, 1, "emailaddress1")),
                         // Registered as a type but with no step against it: nothing to document.
-                        NewType(assembly, "Contoso.Plugins.Shared.PluginBase"),
+                        NewType(assembly, "Contoso.Crm.Sales.Plugins.Shared.Infrastructure.PluginBase"),
                         // The same, but its file is an ordinary class rather than a base: somebody
                         // registered it and has not written a step for it yet. The scan must not
                         // report that file as a class nobody registered, which is the opposite of
                         // what happened to it.
-                        NewType(assembly, "Contoso.Plugins.Leads.LeadRouting"),
-                        NewType(assembly, "Contoso.Plugins.Opportunities.OpportunityCloseAudit",
+                        NewType(assembly, "Contoso.Crm.Sales.Plugins.Leads.Routing.LeadRoutingPlugin"),
+                        NewType(assembly, "Contoso.Crm.Sales.Plugins.Opportunities.Closing.OpportunityCloseAuditPlugin",
                             NewStep("Win", "opportunity", 40, 1)),
                     };
 
-                case "Contoso.Integration.Plugins":
+                case "Contoso.Crm.Integration.ErpConnector.Plugins":
                     return new List<PluginTypeInfo>
                     {
-                        NewType(assembly, "Contoso.Integration.Plugins.ErpOrderSync",
+                        NewType(assembly, "Contoso.Crm.Integration.ErpConnector.Plugins.Orders.Outbound.ErpOrderSyncPlugin",
                             WithImage(NewStep("Update", "salesorder", 40, 1, "statecode"), "PreImage")),
-                        NewType(assembly, "Contoso.Integration.Plugins.WebhookRetryHandler",
+                        NewType(assembly, "Contoso.Crm.Integration.ErpConnector.Plugins.Webhooks.Retries.WebhookRetryHandlerPlugin",
                             NewStep("contoso_RetryFailedSync", "none", 30, 0)),
                     };
 
@@ -144,9 +145,11 @@ namespace PluginStepCodegen.Harness
         }
 
         /// <summary>
-        /// One source file per state the scan can report. WebhookRetryHandler deliberately gets
-        /// no file (not found), OpportunityCloseAudit gets two in the same namespace (ambiguous),
-        /// two classes exist that nothing registers, and LeadRouting is registered with no step
+        /// One source file per state the scan can report, laid out the way a repository holding
+        /// several plugin projects is: a folder per project, then folders that mirror the
+        /// namespaces a few levels down. WebhookRetryHandlerPlugin deliberately gets no file (not
+        /// found), OpportunityCloseAuditPlugin gets two in the same namespace (ambiguous), two
+        /// classes exist that nothing registers, and LeadRoutingPlugin is registered with no step
         /// against it - a file in none of the three states, which is the point of it.
         /// </summary>
         public static void SeedSourceFolder(string folder, Dictionary<Guid, List<PluginTypeInfo>> typesByAssembly)
@@ -159,26 +162,29 @@ namespace PluginStepCodegen.Harness
             Directory.CreateDirectory(folder);
             var byName = typesByAssembly.Values.SelectMany(t => t).ToDictionary(t => t.ClassName);
 
-            Seed(folder, @"Shared\PluginBase.cs",
-                PluginFile("Contoso.Plugins.Shared", "PluginBase", "IPlugin", isAbstract: true));
-            Seed(folder, @"Accounts\AccountPreValidation.cs",
-                WithAttributes(byName["AccountPreValidation"], stale: false));
-            Seed(folder, @"Accounts\AccountNumberGenerator.cs",
-                WithAttributes(byName["AccountNumberGenerator"], stale: true));
-            Seed(folder, @"Contacts\ContactDeduplication.cs",
-                PluginFile("Contoso.Plugins.Contacts", "ContactDeduplication", "PluginBase"));
-            Seed(folder, @"Opportunities\OpportunityCloseAudit.cs",
-                PluginFile("Contoso.Plugins.Opportunities", "OpportunityCloseAudit", "PluginBase"));
-            Seed(folder, @"Legacy\OpportunityCloseAudit.cs",
-                PluginFile("Contoso.Plugins.Opportunities", "OpportunityCloseAudit", "PluginBase"));
-            Seed(folder, @"Integration\ErpOrderSync.cs",
-                PluginFile("Contoso.Integration.Plugins", "ErpOrderSync", "PluginBase"));
-            Seed(folder, @"Contacts\ContactMerger.cs",
-                PluginFile("Contoso.Plugins.Contacts", "ContactMerger", "IPlugin"));
-            Seed(folder, @"Leads\LeadScoring.cs",
-                PluginFile("Contoso.Plugins.Leads", "LeadScoring", "PluginBase"));
-            Seed(folder, @"Leads\LeadRouting.cs",
-                PluginFile("Contoso.Plugins.Leads", "LeadRouting", "PluginBase"));
+            const string Sales = "Contoso.Crm.Sales.Plugins";
+            const string Erp = "Contoso.Crm.Integration.ErpConnector.Plugins";
+
+            Seed(folder, Sales + @"\Shared\Infrastructure\PluginBase.cs",
+                PluginFile(Sales + ".Shared.Infrastructure", "PluginBase", "IPlugin", isAbstract: true));
+            Seed(folder, Sales + @"\Accounts\PreValidation\AccountPreValidationPlugin.cs",
+                WithAttributes(byName["AccountPreValidationPlugin"], stale: false));
+            Seed(folder, Sales + @"\Accounts\Numbering\AccountNumberGeneratorPlugin.cs",
+                WithAttributes(byName["AccountNumberGeneratorPlugin"], stale: true));
+            Seed(folder, Sales + @"\Contacts\Deduplication\ContactDeduplicationPlugin.cs",
+                PluginFile(Sales + ".Contacts.Deduplication", "ContactDeduplicationPlugin", "PluginBase"));
+            Seed(folder, Sales + @"\Opportunities\Closing\OpportunityCloseAuditPlugin.cs",
+                PluginFile(Sales + ".Opportunities.Closing", "OpportunityCloseAuditPlugin", "PluginBase"));
+            Seed(folder, Sales + @"\Legacy\Opportunities\Closing\OpportunityCloseAuditPlugin.cs",
+                PluginFile(Sales + ".Opportunities.Closing", "OpportunityCloseAuditPlugin", "PluginBase"));
+            Seed(folder, Erp + @"\Orders\Outbound\ErpOrderSyncPlugin.cs",
+                PluginFile(Erp + ".Orders.Outbound", "ErpOrderSyncPlugin", "PluginBase"));
+            Seed(folder, Sales + @"\Contacts\Merging\ContactMergerPlugin.cs",
+                PluginFile(Sales + ".Contacts.Merging", "ContactMergerPlugin", "IPlugin"));
+            Seed(folder, Sales + @"\Leads\Scoring\LeadScoringPlugin.cs",
+                PluginFile(Sales + ".Leads.Scoring", "LeadScoringPlugin", "PluginBase"));
+            Seed(folder, Sales + @"\Leads\Routing\LeadRoutingPlugin.cs",
+                PluginFile(Sales + ".Leads.Routing", "LeadRoutingPlugin", "PluginBase"));
         }
 
         private static void Seed(string folder, string relative, string content)
