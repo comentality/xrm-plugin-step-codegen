@@ -84,6 +84,12 @@ namespace PluginStepCodegen.UiHarness
                 settle.Tick += (s2, e2) =>
                 {
                     settle.Stop();
+                    if (Environment.GetEnvironmentVariable("UIHARNESS_DRAG") == "1")
+                    {
+                        try { File.WriteAllText(outPath + ".drag.txt", Drags(control)); }
+                        catch (Exception ex) { failures.Add(ex.ToString()); }
+                    }
+
                     try { Capture.Of(form, outPath); }
                     catch (Exception ex) { failures.Add(ex.ToString()); }
                     form.Close();
@@ -99,6 +105,95 @@ namespace PluginStepCodegen.UiHarness
             File.WriteAllText(log, string.Join("\n----\n", failures));
             Console.Error.WriteLine("failed, see " + log);
             return 1;
+        }
+
+        private const int WM_MOUSEMOVE = 0x0200, WM_LBUTTONDOWN = 0x0201, WM_LBUTTONUP = 0x0202;
+        private const int LVM_GETHEADER = 0x101F;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hwnd, int message, IntPtr wparam, IntPtr lparam);
+
+        private static IntPtr Point(int x, int y)
+        {
+            return (IntPtr)((y << 16) | (x & 0xFFFF));
+        }
+
+        /// <summary>
+        /// A press, a walk and a release, as mouse messages to the window under the pointer. A
+        /// drag is the one thing no property set can stand in for: SplitterMoving only fires for
+        /// a hand on the splitter, and the header only tracks a divider it saw pressed.
+        /// </summary>
+        private static void Drag(IntPtr hwnd, int x, int y, int dx, Action during)
+        {
+            SendMessage(hwnd, WM_LBUTTONDOWN, (IntPtr)1, Point(x, y));
+            for (var step = 1; step <= 10; step++)
+            {
+                SendMessage(hwnd, WM_MOUSEMOVE, (IntPtr)1, Point(x + dx * step / 10, y));
+                Application.DoEvents();
+            }
+
+            if (during != null) during();
+            SendMessage(hwnd, WM_LBUTTONUP, IntPtr.Zero, Point(x + dx, y));
+            Application.DoEvents();
+        }
+
+        private static void Settle()
+        {
+            for (var i = 0; i < 20; i++)
+            {
+                Application.DoEvents();
+                System.Threading.Thread.Sleep(10);
+            }
+        }
+
+        /// <summary>
+        /// Drags both splitters and a column divider by hand and says where each ended up, so the
+        /// caps can be read as numbers: past the widest line, short of it, and back out again.
+        /// </summary>
+        private static string Drags(PluginStepCodegenControl control)
+        {
+            var log = new System.Text.StringBuilder();
+            var main = Field<SplitContainer>(control, "_mainSplit");
+            var right = Field<SplitContainer>(control, "_rightSplit");
+            var types = Field<ListView>(control, "_lvTypes");
+
+            Action<string, SplitContainer, string, int> split = (name, s, natural, dx) =>
+            {
+                var before = s.SplitterDistance;
+                var x = s.SplitterRectangle.X + s.SplitterRectangle.Width / 2;
+                var y = s.Height / 2;
+                var mid = -1;
+                Drag(s.Handle, x, y, dx, () => mid = s.SplitterDistance);
+                var released = s.SplitterDistance;
+                Settle();
+                log.AppendLine(name + " drag " + dx + ": before " + before + ", mid-drag " + mid + ", on release "
+                    + released + ", settled " + s.SplitterDistance + ", natural " + Field<int>(control, natural));
+            };
+
+            split("left", main, "_leftNatural", 200);
+            split("left", main, "_leftNatural", -40);
+            Invoke(control, "RenderAssemblies");
+            Settle();
+            log.AppendLine("left after a re-render: " + main.SplitterDistance);
+            split("left", main, "_leftNatural", 200);
+
+            split("source", right, "_sourceNatural", 200);
+            split("source", right, "_sourceNatural", -40);
+            Invoke(control, "RenderAssemblies");
+            Settle();
+            log.AppendLine("source after a re-render: " + right.SplitterDistance);
+            split("source", right, "_sourceNatural", 200);
+
+            var naturals = Field<Dictionary<ListView, int[]>>(control, "_columnNaturals")[types];
+            var header = SendMessage(types.Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
+            var divider = types.Columns[0].Width + types.Columns[1].Width;
+            var was = types.Columns[1].Width;
+            var midWidth = -1;
+            Drag(header, divider, 8, 60, () => midWidth = types.Columns[1].Width);
+            Settle();
+            log.AppendLine("Steps divider drag 60: before " + was + ", mid-drag " + midWidth + ", settled "
+                + types.Columns[1].Width + ", natural " + naturals[1]);
+            return log.ToString();
         }
 
         private static T Field<T>(object target, string name)

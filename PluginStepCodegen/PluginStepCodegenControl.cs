@@ -194,12 +194,14 @@ namespace PluginStepCodegen
         private int _previewNatural;
 
         /// <summary>
-        /// A pane somebody dragged narrower than its content. Kept across fits, because the panes
-        /// are refitted on every render and a drag undone by the next tick is no drag at all;
-        /// dragging it back out to its content forgets it.
+        /// A pane somebody dragged, at the width they left it. Kept across fits, because the panes
+        /// are refitted on every render and a drag undone by the next tick is no drag at all, and
+        /// left out of the sharing when the window is short: in a tight window the drag is
+        /// somebody saying which pane the room should go to. Dragged out to its content it stays
+        /// open as the content grows, which is what int.MaxValue here means.
         /// </summary>
-        private int? _leftCap;
-        private int? _sourceCap;
+        private int? _leftPin;
+        private int? _sourcePin;
 
         private bool _fitPending;
 
@@ -773,7 +775,7 @@ namespace PluginStepCodegen
                 if (!_draggingLeft) return;
                 _draggingLeft = false;
                 var distance = _mainSplit.SplitterDistance;
-                _leftCap = distance < _leftNatural ? distance : (int?)null;
+                _leftPin = distance < _leftNatural ? distance : int.MaxValue;
                 RequestFit();
             };
             _rightSplit.SplitterMoving += (s, e) => _draggingSource = true;
@@ -785,7 +787,7 @@ namespace PluginStepCodegen
                 // that is width with nothing in it, so the drag stops where the preview is full.
                 var distance = Math.Max(_rightSplit.SplitterDistance,
                     _rightSplit.Width - _rightSplit.SplitterWidth - _previewNatural);
-                _sourceCap = distance < _sourceNatural ? distance : (int?)null;
+                _sourcePin = distance < _sourceNatural ? distance : int.MaxValue;
                 RequestFit();
             };
 
@@ -968,6 +970,16 @@ namespace PluginStepCodegen
                     }));
                 }
             };
+            // Cancelling above does not hold on its own: the header still applies the width the
+            // divider was released at. This is what actually keeps the column on the line.
+            list.ColumnWidthChanged += (s, e) =>
+            {
+                int[] naturals;
+                if (!_columnNaturals.TryGetValue(list, out naturals) || e.ColumnIndex >= naturals.Length) return;
+
+                var column = list.Columns[e.ColumnIndex];
+                if (column.Width > naturals[e.ColumnIndex]) column.Width = naturals[e.ColumnIndex];
+            };
         }
 
         /// <summary>
@@ -1026,6 +1038,9 @@ namespace PluginStepCodegen
         private int MeasureColumns(ListView list)
         {
             var naturals = new int[list.Columns.Count];
+            // The autosize below raises ColumnWidthChanged, and held to the last measure a
+            // column could never grow with its content.
+            _columnNaturals.Remove(list);
             list.BeginUpdate();
             for (var i = 0; i < naturals.Length; i++)
             {
@@ -1138,8 +1153,8 @@ namespace PluginStepCodegen
                 _previewNatural = MeasurePreview();
             }
 
-            var left = Math.Max(Math.Min(_leftNatural, _leftCap ?? int.MaxValue), _mainSplit.Panel1MinSize);
-            var source = Math.Max(Math.Min(_sourceNatural, _sourceCap ?? int.MaxValue), _rightSplit.Panel1MinSize);
+            var left = Math.Max(Math.Min(_leftNatural, _leftPin ?? int.MaxValue), _mainSplit.Panel1MinSize);
+            var source = Math.Max(Math.Min(_sourceNatural, _sourcePin ?? int.MaxValue), _rightSplit.Panel1MinSize);
 
             var previewShown = !_rightSplit.Panel2Collapsed;
             var room = _mainSplit.Width - _mainSplit.SplitterWidth;
@@ -1152,8 +1167,10 @@ namespace PluginStepCodegen
             var over = left + source - room;
             if (over > 0)
             {
-                var spareLeft = left - _mainSplit.Panel1MinSize;
-                var spareSource = source - _rightSplit.Panel1MinSize;
+                // A dragged pane gives nothing up. With both dragged the preview pays, down to
+                // its minimum, and SetDistance holds the line there.
+                var spareLeft = _leftPin.HasValue ? 0 : left - _mainSplit.Panel1MinSize;
+                var spareSource = _sourcePin.HasValue ? 0 : source - _rightSplit.Panel1MinSize;
                 if (spareLeft + spareSource <= over)
                 {
                     left -= spareLeft;

@@ -22,11 +22,12 @@
   Every column used to take a fixed share of its list and every pane a fixed width, so a
   path three folders deep ended in an ellipsis beside a half-empty Steps column. Now the
   short columns are exactly as wide as their widest entry, the assembly, class and path
-  columns take what is left, and the panes follow: the preview keeps its longest line (or a
-  third of the window when that is more), and the assembly and source panes share the rest.
-  The fit is redone whenever the lists or the preview change. Dragging a splitter or a column
-  divider stops at the widest line; a pane you drag narrower stays that way until you drag it
-  back out.
+  columns take what is left, and the panes follow: the assembly and source panes get their
+  widest line first, and the preview gets the rest. It is always left its own longest line
+  or a third of the window, whichever is less, and scrolls sideways past that.
+  The fit is redone whenever the lists or the preview change. A column divider stops at the
+  widest line, and a splitter dragged past it settles back there when you let go. A pane you
+  drag keeps the width you gave it, so in a tight window you can choose which one gets the room.
 
 - `tests\profile.ps1` profiles every step of the end to end fixture with the Plugin
   Registration Tool's own profiler library, reads the fixture before, during and after, and
