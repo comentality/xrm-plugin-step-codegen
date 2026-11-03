@@ -29,7 +29,7 @@ nobody outside Microsoft can sign with, and it covers Power Pages, Field Service
 rest of the optional apps whatever they call themselves and whichever of Microsoft's
 several publishers shipped them. Assembly names were tried first and were not good enough:
 first party apps ship under their own names, and an assembly of yours called
-`Microsoft.Contoso.Extensions` is not Microsoft's.
+`Microsoft.Contoso.Crm.Extensions.Plugins` is not Microsoft's.
 
 **Managed** — everything else that came in a solution. An ISV's app, or your own, shipped.
 

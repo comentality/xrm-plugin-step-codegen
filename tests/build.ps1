@@ -262,7 +262,7 @@ function New-StepXml {
     [void]$xml.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
     [void]$xml.AppendLine("<SdkMessageProcessingStep SdkMessageProcessingStepId=`"{$stepId}`" Name=`"$(ConvertTo-XmlText $name)`">")
     # Qualified by the assembly, which is what tells two registrations of the same type
-    # name - Shared.Twin is in two assemblies - apart.
+    # name - AccountTwinSyncPlugin is in two assemblies - apart.
     [void]$xml.AppendLine("  <PluginTypeName>$(ConvertTo-XmlText ($typeName + ', ' + $info.FullName))</PluginTypeName>")
     [void]$xml.AppendLine("  <PluginTypeId>$typeId</PluginTypeId>")
 

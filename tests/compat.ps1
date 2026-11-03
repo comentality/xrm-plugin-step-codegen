@@ -226,7 +226,7 @@ $corpus = @(
     )
 
     # Images: both constructors, all three types, every named argument.
-    New-Type -Name 'ImageShapes' -Steps @(
+    New-Type -Name 'ImageEveryShape' -Steps @(
         (New-Step -Message 'Update' -Entity 'account' -Stage 40 -Images @(
             (New-Image -ImageType 0)
             (New-Image -ImageType 1 -Attributes 'name,accountnumber')

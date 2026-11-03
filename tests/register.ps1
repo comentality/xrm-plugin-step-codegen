@@ -5,7 +5,8 @@
 .DESCRIPTION
     Builds the fixture solutions and imports them:
 
-      PluginStepCodegenE2E          publisher Comentality: Microsoft.Contoso.Extensions,
+      PluginStepCodegenE2E          publisher Comentality:
+                                   Microsoft.Contoso.Crm.Extensions.Plugins,
                                    its plugin type and its step, imported with
                                    --activate-plugins
       PluginStepCodegenE2EContoso   publisher Contoso: the three Contoso assemblies and

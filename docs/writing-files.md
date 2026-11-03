@@ -68,15 +68,15 @@ The preview is replaced by a tally of what happened, and a dialog gives the same
 
 ```
 // Updated (6)
-//   AccountPreValidation
+//   AccountPreValidationPlugin
 //   ...
 
 // Already up to date (1)
-//   ErpOrderSync
+//   ErpOrderSyncPlugin
 
 // No matching .cs file (2)
-//   Bravo
-//   Ghost
+//   BravoFollowUpTaskPlugin
+//   GhostTaskImpersonatedUpdatePlugin
 
 // Ambiguous, several files declare the class (1)
 //   Worker (2 files)

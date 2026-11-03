@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AssemblyName>Fabrikam.Dynamics.Sales.Plugins</AssemblyName>
+    <RootNamespace>Fabrikam.Dynamics.Sales.Plugins</RootNamespace>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\keys\Fabrikam.snk</AssemblyOriginatorKeyFile>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <!-- The fixtures are deliberately empty, so unused parameters are the point. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The very file the tool drops into a user's project. Linking it here means the
+      fixtures compile against the same definitions the tool emits, so a build after a run
+      is itself a test: if the generated attributes do not compile, this project breaks.
+    -->
+    <Compile Include="..\..\..\assets\XrmToolsMetaAttributes.cs" Link="XrmToolsMetaAttributes.cs" />
+    <!--
+      Shared with Contoso.Crm.CustomerService.Plugins, which links the same file.
+      AccountTwinSyncPlugin is therefore a type in both assemblies and is registered from both,
+      against one .cs.
+    -->
+    <Compile Include="..\Shared\Plugins\Accounts\AccountTwinSyncPlugin.cs" Link="Shared\Plugins\Accounts\AccountTwinSyncPlugin.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.*" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

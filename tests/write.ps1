@@ -18,16 +18,18 @@
 
       A. The default list - the two unmanaged assemblies - written in attribute mode
          twice and comment mode twice. Everything resolves to a file, the second pass of
-         each mode changes nothing, and the sandbox TestPlugins project still compiles.
+         each mode changes nothing, and the sandbox Fabrikam.Dynamics.Sales.Plugins project
+         still compiles.
 
-      B. All six assemblies. Bravo and Ghost have no source, Twin is written once per
-         assembly and cannot settle, and nothing is ambiguous: the short names Duplicate
-         and Rival match two files each, and the registered namespace picks the right one.
+      B. All six assemblies. The two orphan classes have no source, AccountTwinSyncPlugin is
+         written once per assembly and cannot settle, and nothing is ambiguous: the short
+         names NoteCreateDuplicatePlugin and RivalDeleteGuardPlugin match two files each,
+         and the registered namespace picks the right one.
 
       C. The default list in comment mode with the experimental "(all columns except: ...)"
          rendering on: the emitter is handed the stand-in column universes the tool would
-         have fetched, and NearlyAllColumns collapses to its exceptions while every other
-         list stays exactly as it reads in scenario A.
+         have fetched, and NearlyAllColumnsFilteringPlugin collapses to its exceptions while
+         every other list stays exactly as it reads in scenario A.
 
     Sandboxes live under tests\obj\write and are rebuilt on every run.
 #>
@@ -58,7 +60,7 @@ $dll = Resolve-Path (Join-Path $root '..\PluginStepCodegen\bin\Debug\net48\Plugi
 $work = Join-Path $root '.write'
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 
-# TestPlugins.csproj links ..\..\..\assets\XrmToolsMetaAttributes.cs - the very file the
+# Every fixture csproj links ..\..\..\assets\XrmToolsMetaAttributes.cs - the very file the
 # tool emits - so the compile check needs the assets folder two levels above each
 # sandbox's src, exactly where the repository keeps it relative to tests\src.
 New-Item -ItemType Directory -Path (Join-Path $work 'assets') -Force | Out-Null
@@ -69,6 +71,11 @@ function New-Sandbox {
 
     $dest = Join-Path $work "$Name\src"
     robocopy (Join-Path $root 'src') $dest /MIR /XD obj bin /XF *.bak /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
+
+    # The projects sign with ..\..\keys\*.snk, beside src rather than inside it, so each
+    # sandbox carries its own copy at the same distance.
+    robocopy (Join-Path $root 'keys') (Join-Path $work "$Name\keys") *.snk /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
     $dest
 }
@@ -89,7 +96,7 @@ function Get-SourceHashes {
 # they expand against these, the same way the impersonating user's name is a stand-in.
 # Each is a plausible slice of the real table, sized so that every literal list in the
 # matrix stays on the same side of the quarter rule it is on in a real environment - the
-# WideRegistration ten names are a minority of account's columns here too.
+# AccountWideRegistrationOrderingPlugin's ten names are a minority of account's columns here too.
 function New-StandInColumns {
     param([string[]] $Updatable, [string[]] $ReadOnly)
 
@@ -157,7 +164,7 @@ function Get-TypeModels {
     param([hashtable] $Assembly)
 
     # A description imported in a solution loses its CRLF: XML normalises line endings
-    # inside an element. The unmanaged route keeps them. See Contoso.Crm.Charlie.
+    # inside an element. The unmanaged route keeps them. See CharlieContactJobTitlePlugin.
     $managed = $null -ne $Assembly.Solution
 
     foreach ($t in $Assembly.Types | Sort-Object { $_.Name }) {
@@ -306,7 +313,7 @@ Check 'attributes again: all seventeen already up to date' `
 # --- The generic plugin: five tables, ten steps, and the two orders they come out in.
 # The attributes are what Xrm Tools reads back, so they stay in execution order however
 # it interleaves the tables. Read now, before the comment run rewrites the file.
-$stamper = Get-Content (Join-Path $sandboxA 'TestPlugins\Plugins\StatusDateStamper.cs') -Raw
+$stamper = Get-Content (Join-Path $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Common\Stamping\GenericStatusChangeDateStamperPlugin.cs') -Raw
 $stamperSteps = @([regex]::Matches($stamper, '\[Step\("(?<message>\w+)", "(?<entity>\w+)"') |
     ForEach-Object { "$($_.Groups['entity'].Value)/$($_.Groups['message'].Value)" })
 $expectedStamper = @(
@@ -328,9 +335,9 @@ Check 'comment again: all seventeen already up to date' `
 # The same ten steps, off the same list, in the order the comment reads them: by table,
 # alphabetically, each table keeping the execution order it arrived in - which is why
 # annotation reads update before create.
-Test-FileContains $sandboxA 'TestPlugins\Plugins\StatusDateStamper.cs' `
+Test-FileContains $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Common\Stamping\GenericStatusChangeDateStamperPlugin.cs' `
     '/// Sync Post-Create of account (order 1): (all columns)'
-$stamperComment = Get-Content (Join-Path $sandboxA 'TestPlugins\Plugins\StatusDateStamper.cs') -Raw
+$stamperComment = Get-Content (Join-Path $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Common\Stamping\GenericStatusChangeDateStamperPlugin.cs') -Raw
 $commentSteps = @([regex]::Matches($stamperComment, '///\s+(?:Sync|Async) \w+-(?<message>\w+) of (?<entity>\w+)') |
     ForEach-Object { "$($_.Groups['entity'].Value)/$($_.Groups['message'].Value)" })
 $expectedComment = @(
@@ -352,39 +359,39 @@ Check 'writing the comment left the attribute order alone' `
 
 # A step with no table to group under still emits both ways: the entity is what the
 # ordering now keys on, and a global message has none.
-Test-FileContains $sandboxA 'TestPlugins\Plugins\GlobalMessageHandler.cs' `
+Test-FileContains $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Messages\Global\AssociateGlobalMessageHandlerPlugin.cs' `
     '[Step("Associate", Stages.PreValidation, ExecutionMode.Synchronous)]'
-Test-FileContains $sandboxA 'TestPlugins\Plugins\GlobalMessageHandler.cs' `
+Test-FileContains $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Messages\Global\AssociateGlobalMessageHandlerPlugin.cs' `
     '/// Sync PreValidation-Associate (order 1)'
 
 # The namespace settles both short name collisions in this view.
-Test-FileContains $sandboxA 'TestPlugins\Plugins\Duplicates\AlphaDuplicate.cs' `
+Test-FileContains $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Notes\Duplicates\CurrentNoteCreateDuplicatePlugin.cs' `
     '[Step("Create", "annotation", Stages.PostOperation, ExecutionMode.Synchronous)]'
-Test-FileContains $sandboxA 'TestPlugins\Plugins\Rival.cs' `
+Test-FileContains $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\Guards\RivalDeleteGuardPlugin.cs' `
     '[Step("Delete", "task", Stages.PreOperation, ExecutionMode.Synchronous)]'
 
 # The impersonation stand-in went through the same plumbing the real name would.
-Test-FileContains $sandboxA 'TestPlugins\Plugins\DisabledAndImpersonated.cs' 'E2E Test User'
+Test-FileContains $sandboxA 'Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\TaskDisabledAndImpersonatedPlugin.cs' 'E2E Test User'
 
 # Exactly the seventeen files, and nothing else, changed.
 $expectedChangedA = @(
-    'TestPlugins\Plugins\SimpleCreate.cs'
-    'TestPlugins\Plugins\StatusDateStamper.cs'
-    'TestPlugins\Plugins\FilteredUpdate.cs'
-    'TestPlugins\Plugins\AsyncWorker.cs'
-    'TestPlugins\Plugins\GlobalMessageHandler.cs'
-    'TestPlugins\Plugins\ImageShapes.cs'
-    'TestPlugins\Plugins\DisabledAndImpersonated.cs'
-    'TestPlugins\Plugins\EscapedText.cs'
-    'TestPlugins\Plugins\WideRegistration.cs'
-    'TestPlugins\Plugins\HandWritten.cs'
-    'TestPlugins\Plugins\Duplicates\AlphaDuplicate.cs'
-    'TestPlugins\Plugins\NearlyAllColumns.cs'
-    'TestPlugins\Plugins\Rival.cs'
-    'Shared\Twin.cs'
-    'WorkInProgressPlugins\NewFeature.cs'
-    'WorkInProgressPlugins\HalfFinished.cs'
-    'WorkInProgressPlugins\Scratch.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Accounts\Creation\AccountCreateDefaultsPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Common\Stamping\GenericStatusChangeDateStamperPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Contacts\Names\ContactNameFilteredUpdatePlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Accounts\Rollups\AccountRollupAsyncWorkerPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Messages\Global\AssociateGlobalMessageHandlerPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Accounts\Images\AccountImageShapesPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\TaskDisabledAndImpersonatedPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Accounts\Text\AccountEscapedTextDescriptionPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Accounts\Ordering\AccountWideRegistrationOrderingPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Notes\Annotations\AnnotationHandWrittenDocsPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Notes\Duplicates\CurrentNoteCreateDuplicatePlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Diagnostics\Columns\NearlyAllColumnsFilteringPlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\Guards\RivalDeleteGuardPlugin.cs'
+    'Shared\Plugins\Accounts\AccountTwinSyncPlugin.cs'
+    'Fabrikam.Dynamics.Subscriptions.Plugins\Accounts\Onboarding\AccountSubscriptionNewFeaturePlugin.cs'
+    'Fabrikam.Dynamics.Subscriptions.Plugins\Contacts\Renewals\ContactRenewalHalfFinishedPlugin.cs'
+    'Fabrikam.Dynamics.Subscriptions.Plugins\Activities\Tasks\Cleanup\TaskDeleteScratchCleanupPlugin.cs'
 )
 $after = Get-SourceHashes $sandboxA
 $changed = @($before.Keys | Where-Object { $before[$_] -ne $after[$_] } | Sort-Object)
@@ -398,8 +405,8 @@ Check 'no .bak copy was left anywhere' `
     (@(Get-ChildItem $sandboxA -Recurse -Filter *.bak).Count -eq 0)
 
 # The emitted attributes compile - against the very definitions file the tool drops.
-dotnet build (Join-Path $sandboxA 'TestPlugins') -c Debug --nologo -v q | Out-Null
-Check 'the written TestPlugins project compiles' ($LASTEXITCODE -eq 0)
+dotnet build (Join-Path $sandboxA 'Fabrikam.Dynamics.Sales.Plugins') -c Debug --nologo -v q | Out-Null
+Check 'the written Fabrikam.Dynamics.Sales.Plugins project compiles' ($LASTEXITCODE -eq 0)
 
 # ========================================================== B. all six assemblies
 Write-Host "Scenario B - all six assemblies, attribute mode, twice"
@@ -414,33 +421,33 @@ $b1 = Invoke-WriteRun $sandboxB $allTypes 'Attributes'
 Check 'twenty two updated, none ambiguous' `
     (@($b1.Updated).Count -eq 22 -and @($b1.Ambiguous).Count -eq 0 -and @($b1.Failed).Count -eq 0) `
     "($(Format-Report $b1))"
-Check 'only Bravo and Ghost have no source' `
-    ((@($b1.NotFound) | Sort-Object) -join ',' -eq 'Bravo,Ghost') "(got $($b1.NotFound -join ', '))"
-Check 'Twin written once per assembly' (@($b1.Updated | Where-Object { $_ -eq 'Twin' }).Count -eq 2)
+Check 'only the two orphans have no source' `
+    ((@($b1.NotFound) | Sort-Object) -join ',' -eq 'BravoFollowUpTaskPlugin,GhostTaskImpersonatedUpdatePlugin') "(got $($b1.NotFound -join ', '))"
+Check 'the shared twin written once per assembly' (@($b1.Updated | Where-Object { $_ -eq 'AccountTwinSyncPlugin' }).Count -eq 2)
 
 $b2 = Invoke-WriteRun $sandboxB $allTypes 'Attributes'
-Check 'second run: only Twin cannot settle' `
-    ((@($b2.Updated) -join ',') -eq 'Twin,Twin' -and @($b2.Unchanged).Count -eq 20) "($(Format-Report $b2))"
+Check 'second run: only the shared twin cannot settle' `
+    ((@($b2.Updated) -join ',') -eq 'AccountTwinSyncPlugin,AccountTwinSyncPlugin' -and @($b2.Unchanged).Count -eq 20) "($(Format-Report $b2))"
 
-# Each Rival registration landed in its own file, never the other's.
-Test-FileContains $sandboxB 'TestPlugins\Plugins\Rival.cs' `
+# Each RivalDeleteGuardPlugin registration landed in its own file, never the other's.
+Test-FileContains $sandboxB 'Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\Guards\RivalDeleteGuardPlugin.cs' `
     '[Step("Delete", "task", Stages.PreOperation, ExecutionMode.Synchronous)]'
-Test-FileContains $sandboxB 'TestPlugins\Plugins\Rival.cs' '"contact"' $false
-Test-FileContains $sandboxB 'ContosoPlugins\Rival.cs' `
+Test-FileContains $sandboxB 'Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\Guards\RivalDeleteGuardPlugin.cs' '"contact"' $false
+Test-FileContains $sandboxB 'Contoso.Crm.CustomerService.Plugins\Contacts\Guards\RivalDeleteGuardPlugin.cs' `
     '[Step("Delete", "contact", Stages.PreOperation, ExecutionMode.Synchronous)]'
-Test-FileContains $sandboxB 'ContosoPlugins\Rival.cs' '"task"' $false
+Test-FileContains $sandboxB 'Contoso.Crm.CustomerService.Plugins\Contacts\Guards\RivalDeleteGuardPlugin.cs' '"task"' $false
 
-# Twin holds the registration written last: TestPlugins', in assembly order.
-Test-FileContains $sandboxB 'Shared\Twin.cs' 'ExecutionOrder = 3'
-Test-FileContains $sandboxB 'Shared\Twin.cs' 'ExecutionOrder = 4' $false
+# The twin holds the registration written last: Fabrikam's, in assembly order.
+Test-FileContains $sandboxB 'Shared\Plugins\Accounts\AccountTwinSyncPlugin.cs' 'ExecutionOrder = 3'
+Test-FileContains $sandboxB 'Shared\Plugins\Accounts\AccountTwinSyncPlugin.cs' 'ExecutionOrder = 4' $false
 
 # The files no run may touch came back byte for byte identical.
 $afterB = Get-SourceHashes $sandboxB
 foreach ($path in @(
-    'TestPlugins\Plugins\Duplicates\BetaDuplicate.cs'
-    'TestPlugins\Plugins\NeverRegistered.cs'
-    'ContosoPlugins\StaleDoc.cs'
-    'ContosoPlugins\Untouched.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Notes\Duplicates\LegacyNoteCreateDuplicatePlugin.cs'
+    'Fabrikam.Dynamics.Sales.Plugins\Common\Placeholders\RegisteredTypeWithoutStepsPlugin.cs'
+    'Contoso.Crm.CustomerService.Plugins\Leads\Qualification\LeadCreateStaleDocsPlugin.cs'
+    'Contoso.Crm.CustomerService.Plugins\Cases\Routing\CaseRoutingUntouchedPlugin.cs'
 )) {
     Check "$path untouched" ($beforeB[$path] -eq $afterB[$path])
 }
@@ -462,20 +469,20 @@ Check 'comment with columns again: all seventeen already up to date' `
 # The three shapes, one step each: near-complete says its exceptions, complete says it
 # is complete, and a name outside the universe - createdon is real but not updatable -
 # keeps its list verbatim, because the odd name out is the finding.
-Test-FileContains $sandboxC 'TestPlugins\Plugins\NearlyAllColumns.cs' '(all columns except: notetext, subject)'
-Test-FileContains $sandboxC 'TestPlugins\Plugins\NearlyAllColumns.cs' '(all columns except: documentbody)'
-Test-FileContains $sandboxC 'TestPlugins\Plugins\NearlyAllColumns.cs' '(all 10 columns, written out)'
-Test-FileContains $sandboxC 'TestPlugins\Plugins\NearlyAllColumns.cs' 'createdon, firstname, lastname'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Diagnostics\Columns\NearlyAllColumnsFilteringPlugin.cs' '(all columns except: notetext, subject)'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Diagnostics\Columns\NearlyAllColumnsFilteringPlugin.cs' '(all columns except: documentbody)'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Diagnostics\Columns\NearlyAllColumnsFilteringPlugin.cs' '(all 10 columns, written out)'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Diagnostics\Columns\NearlyAllColumnsFilteringPlugin.cs' 'createdon, firstname, lastname'
 
 # The quarter rule, judged with the universe present rather than absent: ten of account's
 # twenty five stand-in columns is nowhere near "all", so the list stays a list.
-Test-FileContains $sandboxC 'TestPlugins\Plugins\WideRegistration.cs' '(all columns except' $false
-Test-FileContains $sandboxC 'TestPlugins\Plugins\WideRegistration.cs' 'accountcategorycode, accountnumber'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Accounts\Ordering\AccountWideRegistrationOrderingPlugin.cs' '(all columns except' $false
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Accounts\Ordering\AccountWideRegistrationOrderingPlugin.cs' 'accountcategorycode, accountnumber'
 
 # A short list stays a list, and no filter at all still reads "(all columns)" rather
 # than "written out" - a registration with no list follows the table as it grows.
-Test-FileContains $sandboxC 'TestPlugins\Plugins\FilteredUpdate.cs' 'firstname, lastname, emailaddress1'
-Test-FileContains $sandboxC 'TestPlugins\Plugins\SimpleCreate.cs' '(all columns)'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Contacts\Names\ContactNameFilteredUpdatePlugin.cs' 'firstname, lastname, emailaddress1'
+Test-FileContains $sandboxC 'Fabrikam.Dynamics.Sales.Plugins\Accounts\Creation\AccountCreateDefaultsPlugin.cs' '(all columns)'
 
 # ------------------------------------------------------------------------------ tally
 Write-Host ''

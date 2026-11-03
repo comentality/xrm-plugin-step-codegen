@@ -12,8 +12,8 @@
     does not, and the check names what it was looking for.
 
     With several assemblies in play, every step query is also tied to the assembly it
-    belongs to. Shared.Twin is registered from two of them, so a check that only named the
-    plugin type would happily pass against the wrong one.
+    belongs to. AccountTwinSyncPlugin is registered from two of them, so a check that only
+    named the plugin type would happily pass against the wrong one.
 #>
 [CmdletBinding()]
 param([string] $Environment)

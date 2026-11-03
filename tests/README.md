@@ -32,7 +32,7 @@ left alone.
 
 `xtb.ps1` leaves you looking at the tool, connected, with the source folder on the
 clipboard. Compare what it writes with [Expected output](#expected-output) below.
-`dotnet build tests\src\TestPlugins` afterwards is itself a check: the project compiles
+`dotnet build tests\src\Fabrikam.Dynamics.Sales.Plugins` afterwards is itself a check: the project compiles
 against the same `XrmToolsMetaAttributes.cs` the tool emits, so attributes that do not
 compile break the build.
 
@@ -44,16 +44,22 @@ only way to reach the things that can only go wrong when a class name is not uni
 one:
 
 ```
-tests\src\                    <- point the tool here
-    TestPlugins\              registered by hand, in no solution
-    WorkInProgressPlugins\    registered by hand, in no solution
-    ContosoPlugins\           Contoso's assembly, shipped in a managed solution
-    MsContosoExtensions\      the assembly named Microsoft, also shipped
-    Shared\                   Twin.cs, compiled into two of them
-tests\nosource\               deliberately out of reach
-    OrphanPlugins\            registered, and the tool must not find its source
-    EmptyPlugins\             registered, and has no steps to document anyway
+tests\src\                                         <- point the tool here
+    Fabrikam.Dynamics.Sales.Plugins\               registered by hand, in no solution
+    Fabrikam.Dynamics.Subscriptions.Plugins\       registered by hand, in no solution
+    Contoso.Crm.CustomerService.Plugins\           Contoso's assembly, shipped in a managed solution
+    Microsoft.Contoso.Crm.Extensions.Plugins\      the assembly named Microsoft, also shipped
+    Shared\Plugins\Accounts\                       AccountTwinSyncPlugin.cs, compiled into two of them
+tests\nosource\                                    deliberately out of reach
+    Contoso.Crm.CustomerService.Orphan.Plugins\    registered, and the tool must not find its source
+    Contoso.Crm.CustomerService.Empty.Plugins\     registered, and has no steps to document anyway
 ```
+
+The names are the shape real plugin projects have, on purpose: an organisation.project
+assembly name, a namespace per feature area, verbose class names ending in `Plugin`, and
+source spread over folders that mirror the namespaces a few levels down, for example
+`Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\Guards\RivalDeleteGuardPlugin.cs`.
+The window's assembly, class and path columns only meet names of that length here.
 
 An assembly has to be a real signed DLL before Dataverse will accept it, so everything
 under `nosource` still gets built - it just does not live where the tool searches.
@@ -94,7 +100,7 @@ copy of them to be wrong.
 |---|---|
 | `registrations.psd1` | The test matrix. Assemblies, publishers, solutions, plugin types and steps; the only file to edit to change what gets registered. |
 | `src/`, `nosource/` | The plugin projects. Each class's summary says which behaviour it pins. |
-| `keys/Contoso.snk` | The strong name key four of the six assemblies are signed with, whoever published them. |
+| `keys/` | The two strong name keys: `Contoso.snk`, which four of the six assemblies are signed with whoever published them, and `Fabrikam.snk`, which signs the two registered by hand. |
 | `solution/` | The solution manifest template and the two static files every solution carries. |
 | `matrix.ps1` | Ids, assembly full names and generated step names, shared so `build.ps1` and `verify.ps1` cannot disagree. |
 | `build.ps1` | Turns the matrix into three solution zips. `register.ps1` calls it; run it alone to inspect the zips. |
@@ -107,7 +113,7 @@ copy of them to be wrong.
 | `profile.ps1`, `PluginStepCodegen.ProfileHarness\` | A profiled step against the same step unprofiled. Profiles the registered fixture with the Plugin Registration Tool's own profiler library and reads it through the real `RegistrationQuery` before, during and after. Needs the environment and `register.ps1`. |
 | `harness\` | The sample environment, the window capture and the window itself, shared by the UI and slow harnesses so the two cannot disagree about what "the sample" is. |
 
-`TestPlugins.snk` and `keys/Contoso.snk` are committed on purpose. The public key token is
+`keys/Fabrikam.snk` and `keys/Contoso.snk` are committed on purpose. The public key token is
 part of every `AssemblyQualifiedName` in the fixture, and telling one vendor from another
 is exactly what the tool uses a token for, so the keys have to be the same
 everywhere. They sign nothing anyone should trust.
@@ -116,22 +122,23 @@ everywhere. They sign nothing anyone should trust.
 
 | Assembly | Registered | Publisher | Key | Source | Why it is here |
 |---|---|---|---|---|---|
-| `TestPlugins` | by hand | none | its own | `src\TestPlugins` | Every shape of step, image and free text the emitters have to describe - on the route the tool is really used through. |
-| `WorkInProgress.Plugins` | by hand | none | TestPlugins | `src\WorkInProgressPlugins` | The second thing the same developer has open: a plugin still being written, so the default view has two assemblies to group under. |
-| `Contoso.Crm.Plugins` | solution | Contoso | Contoso | `src\ContosoPlugins` | A second vendor in the same source folder: different publisher, different signature, colliding class names. |
-| `Contoso.Crm.Orphan` | solution | Contoso | Contoso | none | Registered, with steps, and no `.cs` anywhere the tool will look. |
-| `Contoso.Crm.Empty` | solution | Contoso | Contoso | none | Plugin types and not one step against any of them. |
-| `Microsoft.Contoso.Extensions` | solution | Comentality | Contoso | `src\MsContosoExtensions` | Named Microsoft, signed by Contoso, shipped by Comentality. The case `IsMicrosoft` gets wrong on purpose. |
+| `Fabrikam.Dynamics.Sales.Plugins` | by hand | none | Fabrikam | `src\Fabrikam.Dynamics.Sales.Plugins` | Every shape of step, image and free text the emitters have to describe - on the route the tool is really used through. |
+| `Fabrikam.Dynamics.Subscriptions.Plugins` | by hand | none | Fabrikam | `src\Fabrikam.Dynamics.Subscriptions.Plugins` | The second thing the same developer has open: a plugin still being written, so the default view has two assemblies to group under. |
+| `Contoso.Crm.CustomerService.Plugins` | solution | Contoso | Contoso | `src\Contoso.Crm.CustomerService.Plugins` | A second vendor in the same source folder: different publisher, different signature, colliding class names. |
+| `Contoso.Crm.CustomerService.Orphan.Plugins` | solution | Contoso | Contoso | none | Registered, with steps, and no `.cs` anywhere the tool will look. |
+| `Contoso.Crm.CustomerService.Empty.Plugins` | solution | Contoso | Contoso | none | Plugin types and not one step against any of them. |
+| `Microsoft.Contoso.Crm.Extensions.Plugins` | solution | Comentality | Contoso | `src\Microsoft.Contoso.Crm.Extensions.Plugins` | Named Microsoft, signed by Contoso, shipped by Comentality. The case `IsMicrosoft` gets wrong on purpose. |
 
 Two publishers and two keys, and nothing lines up:
-`Microsoft.Contoso.Extensions` is called Microsoft, carries the same signature as its
+`Microsoft.Contoso.Crm.Extensions.Plugins` is called Microsoft, carries the same signature as its
 plainly-not-Microsoft neighbours, and was shipped by a publisher of neither name. The
 tool reads the name and the signature and cannot see the publisher at all, which is
 the point of there being one to ignore.
 
 Neither assembly registered by hand has a publisher, because nothing published them. They
-share nothing but a folder: `WorkInProgress.Plugins` is signed with TestPlugins' key
-because it is the same developer's second project rather than a third vendor.
+share nothing but a folder and a key: `Fabrikam.Dynamics.Subscriptions.Plugins` is signed
+with the same key as `Fabrikam.Dynamics.Sales.Plugins` because it is the same developer's
+second project rather than a third vendor.
 
 ## Why three solutions
 
@@ -149,7 +156,7 @@ one field on the record.
 
 | Solution | Publisher | Contents | Imported |
 |---|---|---|---|
-| `PluginStepCodegenE2E` | Comentality | `Microsoft.Contoso.Extensions`, 1 plugin type, 1 step | `--activate-plugins` |
+| `PluginStepCodegenE2E` | Comentality | `Microsoft.Contoso.Crm.Extensions.Plugins`, 1 plugin type, 1 step | `--activate-plugins` |
 | `PluginStepCodegenE2EContoso` | Contoso | the three Contoso assemblies, 8 plugin types, 5 steps | `--activate-plugins` |
 | `PluginStepCodegenE2EDisabled` | Contoso | 1 step | plain, so it stays off |
 
@@ -194,8 +201,8 @@ do not:
   worth having pinned, because those are two quite different pieces of plumbing.
 - **Free text arrives exactly as it was sent.** The Web API keeps CRLF; the solution
   importer does not, because XML normalises line endings inside an element. Same text, two
-  routes, two literals in the emitted attribute. `TestPlugins.EscapedText` and
-  `Contoso.Crm.Charlie` are the pair, and the difference is visible in what the tool
+  routes, two literals in the emitted attribute. `AccountEscapedTextDescriptionPlugin` and
+  `CharlieContactJobTitlePlugin` are the pair, and the difference is visible in what the tool
   writes rather than only in the environment.
 
 There is no zip to delete afterwards, so `unregister.ps1` deletes the records instead:
@@ -446,8 +453,8 @@ With nothing typed in the filter box and both switches off, the list shows **two
 fixture's six, in name order - the two nobody shipped:
 
 ```
-TestPlugins              Sandbox
-WorkInProgress.Plugins   Sandbox
+Fabrikam.Dynamics.Sales.Plugins           Sandbox
+Fabrikam.Dynamics.Subscriptions.Plugins   Sandbox
 ```
 
 That is the whole point of the default: it is what a developer sees in the environment
@@ -459,12 +466,12 @@ counts beside the button are where the rest is accounted for:
 [Load Assemblies]  □ Microsoft's (65)  □ Managed (3)
 ```
 
-- **Managed (3)** is `Contoso.Crm.Plugins`, `Contoso.Crm.Orphan` and `Contoso.Crm.Empty`.
-- **Microsoft's (65)** is the fixture's `Microsoft.Contoso.Extensions` plus however many
+- **Managed (3)** is `Contoso.Crm.CustomerService.Plugins`, `Contoso.Crm.CustomerService.Orphan.Plugins` and `Contoso.Crm.CustomerService.Empty.Plugins`.
+- **Microsoft's (65)** is the fixture's `Microsoft.Contoso.Crm.Extensions.Plugins` plus however many
   first party assemblies the environment really carries - sixty four in a fresh Developer
   environment, which is the number the switch exists for.
 
-`Microsoft.Contoso.Extensions` is managed *and* named Microsoft, and is counted only once,
+`Microsoft.Contoso.Crm.Extensions.Plugins` is managed *and* named Microsoft, and is counted only once,
 on the Microsoft switch. That is the fixture's proof that the two tests are asked in the
 right order: tick **Microsoft's** with **Managed** still off and it appears anyway. Had
 both applied to the same row it could not, and the switch would look broken. It is signed
@@ -483,7 +490,7 @@ Turning **Managed** on and ticking all five:
 5 assemblies · 23 of 23 classes · 1 with no steps
 ```
 
-`Contoso.Crm.Empty` is the one with no steps. It contributes no group at all to the class
+`Contoso.Crm.CustomerService.Empty.Plugins` is the one with no steps. It contributes no group at all to the class
 list - an empty group draws nothing - so the status line is the only place it is
 accounted for.
 
@@ -495,7 +502,7 @@ Things worth doing to the list once it is loaded:
   with the "All" box ticking those three and going indeterminate rather than checked. Turn
   **Microsoft's** on as well and it shows four. The switches and the filter compose rather
   than override each other.
-- Tick `TestPlugins`, then filter it out of view. It stays ticked, its classes stay in the
+- Tick `Fabrikam.Dynamics.Sales.Plugins`, then filter it out of view. It stays ticked, its classes stay in the
   list under their own heading, and the status line says `· 1 out of view`.
 - Tick all five with **Managed** on, then turn it back off. The three managed rows leave
   the list and stay ticked - their classes are still there under their own headings, and
@@ -509,34 +516,34 @@ order and classes within one in type name order. The default list already has tw
 to get right:
 
 ```
-// ===== TestPlugins
-// ===== WorkInProgress.Plugins
+// ===== Fabrikam.Dynamics.Sales.Plugins
+// ===== Fabrikam.Dynamics.Subscriptions.Plugins
 ```
 
 The harder case is behind the **Managed** switch, and is worth checking rather than
 assuming: the environment hands all of the types back in one list sorted by type name, in
-which `Contoso.Crm.Alpha`, `Contoso.Crm.Bravo` and `Contoso.Crm.Charlie` belong to *two
+which `AlphaContactIntakePlugin`, `BravoFollowUpTaskPlugin` and `CharlieContactJobTitlePlugin`, all in one namespace, belong to *two
 different assemblies* in alternation. Both the list and the preview have to regroup them,
 so with all five ticked each assembly's `// =====` heading appears exactly once:
 
 ```
-// ===== Contoso.Crm.Orphan
-// ===== Contoso.Crm.Plugins
-// ===== TestPlugins
-// ===== WorkInProgress.Plugins
+// ===== Contoso.Crm.CustomerService.Orphan.Plugins
+// ===== Contoso.Crm.CustomerService.Plugins
+// ===== Fabrikam.Dynamics.Sales.Plugins
+// ===== Fabrikam.Dynamics.Subscriptions.Plugins
 ```
 
-`Shared.Twin` sorts ahead of everything named `TestPlugins.*`, so it is the first class
-under the TestPlugins heading and the last under Contoso's.
+`Litware.Shared.Plugins.Accounts.AccountTwinSyncPlugin` sorts after everything named
+`Contoso.*` and `Fabrikam.*`, so it is the last class under both of its headings.
 
-## TestPlugins
+## Fabrikam.Dynamics.Sales.Plugins
 
 Everything below is registered by hand, in no solution, and none of it reads any
 differently for that — which is the claim worth making, because the tool is not
-supposed to be able to tell. The one place the route shows through is `EscapedText`, and
+supposed to be able to tell. The one place the route shows through is `AccountEscapedTextDescriptionPlugin`, and
 it shows through in a line ending.
 
-### SimpleCreate
+### AccountCreateDefaultsPlugin
 
 Everything at its default, so everything optional is suppressed: rank 1, the step name
 Dataverse generated, no description. No filter either, which on `Create` means every column
@@ -553,7 +560,7 @@ and is said so rather than left blank.
 /// </remarks>
 ```
 
-### FilteredUpdate
+### ContactNameFilteredUpdatePlugin
 
 Filtering attributes as the third positional argument; the type description reaches
 `[Plugin]`. The image's name, alias and message property are all defaults, so only its
@@ -569,7 +576,7 @@ columns are written.
 ///     PreImage: firstname, lastname
 ```
 
-### AsyncWorker
+### AccountRollupAsyncWorkerPlugin
 
 Every named argument at once, on a line long enough to force the wrap.
 
@@ -585,7 +592,7 @@ Every named argument at once, on a line long enough to force the wrap.
 /// Async Post-Update of account (order 25): name, telephone1
 ```
 
-### GlobalMessageHandler
+### AssociateGlobalMessageHandlerPlugin
 
 No primary entity: the constructor overload without one, and a summary line with no
 `of <entity>`.
@@ -601,7 +608,7 @@ No primary entity: the constructor overload without one, and a summary line with
 `Associate` has no columns to filter, so the header stands alone where a `Create` or
 `Update` step would say `(all columns)`.
 
-### ImageShapes
+### AccountImageShapesPlugin
 
 A post image with no columns at all and a message property that is not `Target`; two images
 on one step; and image type 2. Images within a step come out pre before post. None of these
@@ -627,7 +634,7 @@ steps is filtered, so every header carries `(all columns)` too.
 ///     PreImage and PostImage: name
 ```
 
-### DisabledAndImpersonated
+### TaskDisabledAndImpersonatedPlugin
 
 The two facts only the comment can carry. In attribute mode both steps have to look
 completely ordinary. `As <name>` is whoever ran `register.ps1`.
@@ -642,11 +649,11 @@ completely ordinary. `As <name>` is whoever ran `register.ps1`.
 /// Sync Post-Update of task (order 1, As Kosta Koniev): (all columns)
 ```
 
-### EscapedText
+### AccountEscapedTextDescriptionPlugin
 
 Quote, backslash, tab and newline through the C# literal writer. The step's description
 arrives with `\r\n` intact, because the Web API stores exactly the text it was given.
-`Contoso.Crm.Charlie` carries the same shape of description through a solution and comes
+`CharlieContactJobTitlePlugin` carries the same shape of description through a solution and comes
 back with `\n`, so the pair is what pins the difference.
 
 The summary comment says none of this — names, descriptions and configuration are
@@ -663,7 +670,7 @@ deliberately left out of it - which is also what keeps the doc comment well form
 /// Sync Post-Update of account (order 1): (all columns)
 ```
 
-### WideRegistration
+### AccountWideRegistrationOrderingPlugin
 
 Six steps registered scrambled. Two pairs tie on stage and rank and are separated only by
 message name. The long filter list stays on one line as an attribute - the emitter only
@@ -690,7 +697,7 @@ limit is the line width.
 /// Sync Post-Update of contact (order 10): (all columns)
 ```
 
-### StatusDateStamper
+### GenericStatusChangeDateStamperPlugin
 
 The generic plugin: one class, five tables, a create and an update on each, registered
 scrambled. A plugin repository has far more of these than it has one-table plugins - the
@@ -743,10 +750,10 @@ order by rank alone, and `account`'s by message name.
 Writing one mode must not disturb the other: run attributes then comment over the same
 file and both blocks are present, each in its own order.
 
-`GlobalMessageHandler` is the edge of the same rule: a step on a global message has no
+`AssociateGlobalMessageHandlerPlugin` is the edge of the same rule: a step on a global message has no
 table to group under, and goes last.
 
-### NearlyAllColumns
+### NearlyAllColumnsFilteringPlugin
 
 The three shapes of a column list the experimental `(all columns except: ...)` rendering
 (behind the `†` button, off by default) has to tell apart — and the reason the fixture
@@ -778,7 +785,7 @@ grouping by table looks like when the ranks were assigned across one. In attribu
 the same three steps stay in rank order, 1, 2, 3.
 
 With it off — the default — the annotation and task steps and the image are recited
-exactly as registered, wrapping like WideRegistration's. Attribute mode always writes the literal
+exactly as registered, wrapping like `AccountWideRegistrationOrderingPlugin`'s. Attribute mode always writes the literal
 lists, whatever the setting; they have to compile, and they do.
 
 The image is measured against every real column of annotation where the filter is
@@ -791,7 +798,7 @@ column afterwards drifts out from under them — the near-complete filter grows 
 "except", and verify.ps1 fails until `register.ps1` is re-run. That is the behaviour the
 "(all N columns, written out)" phrasing exists to flag, wearing its own fixture.
 
-### HandWritten
+### AnnotationHandWrittenDocsPlugin
 
 The file arrives already carrying a summary, a hand written `<remarks>`, an `[Obsolete]`,
 a stale `[Step]` and a stale `Register:` block, all describing a registration that no longer
@@ -811,12 +818,15 @@ exists. Afterwards:
 /// Sync Post-Update of annotation (order 2): (all columns)
 ```
 
-### Alpha.Duplicate
+### Notes.Current.NoteCreateDuplicatePlugin
 
-`Duplicate` is declared by both `TestPlugins\Plugins\Duplicates\AlphaDuplicate.cs` and
-`BetaDuplicate.cs`, so the short name alone matches two files — and the registered
-namespace `TestPlugins.Alpha` settles it. `AlphaDuplicate.cs` is written; `BetaDuplicate.cs`
-must come back byte for byte identical.
+`NoteCreateDuplicatePlugin` is declared by both
+`Fabrikam.Dynamics.Sales.Plugins\Notes\Duplicates\CurrentNoteCreateDuplicatePlugin.cs` and
+`LegacyNoteCreateDuplicatePlugin.cs`, neither of them named after the class, so the short
+name alone matches two files — and the registered namespace
+`Fabrikam.Dynamics.Sales.Plugins.Notes.Current` settles it.
+`CurrentNoteCreateDuplicatePlugin.cs` is written; `LegacyNoteCreateDuplicatePlugin.cs` must
+come back byte for byte identical.
 
 ```csharp
 [Plugin]
@@ -826,26 +836,28 @@ must come back byte for byte identical.
 /// Sync Post-Create of annotation (order 1): (all columns)
 ```
 
-### NeverRegistered and Beta.Duplicate
+### RegisteredTypeWithoutStepsPlugin and Notes.Legacy.NoteCreateDuplicatePlugin
 
 Plugin types with no steps. They must not appear in the list at all, and their files must
 come back from a run byte for byte identical.
 
-`NeverRegistered.cs` belongs in the middle column under **Registered, no steps**, not under
+`RegisteredTypeWithoutStepsPlugin.cs` belongs in the middle column under **Registered, no steps**, not under
 **In folder, not registered**: the class is registered, and telling somebody to register
 what they already registered is the one thing that group must never say.
-`BetaDuplicate.cs` is in neither, because it declares `Duplicate` and the registered
-`TestPlugins.Alpha.Duplicate` already accounts for that name.
+`LegacyNoteCreateDuplicatePlugin.cs` is in neither, because it declares
+`NoteCreateDuplicatePlugin` and the registered one in `Notes.Current` already accounts for
+that name.
 
-## Contoso.Crm.Plugins
+## Contoso.Crm.CustomerService.Plugins
 
 Behind the **Managed** switch, along with the rest of what somebody shipped.
 
-### Alpha
+### AlphaContactIntakePlugin
 
 An ordinary class in the second vendor's assembly, documented exactly as if it were in the
-first. What it is really for is the interleave described above: sorted by type name, Alpha
-and Charlie sit either side of `Contoso.Crm.Bravo`, which belongs to `Contoso.Crm.Orphan`.
+first. What it is really for is the interleave described above: sorted by type name, this
+class and `CharlieContactJobTitlePlugin` sit either side of `BravoFollowUpTaskPlugin`, which
+is in the same namespace and belongs to `Contoso.Crm.CustomerService.Orphan.Plugins`.
 
 ```csharp
 [Plugin]
@@ -855,7 +867,7 @@ and Charlie sit either side of `Contoso.Crm.Bravo`, which belongs to `Contoso.Cr
 /// Sync Post-Create of contact (order 1): (all columns)
 ```
 
-### Charlie
+### CharlieContactJobTitlePlugin
 
 Everything the managed route can say that the unmanaged one cannot, on one step. It is
 **disabled**, which no solution can express - so it is imported in the companion without
@@ -872,9 +884,9 @@ endings inside an element:
 /// Sync Post-Update of contact (order 1, disabled): jobtitle
 ```
 
-Compare the `\n` here with the `\r\n` in `TestPlugins.EscapedText`: same shape of text,
+Compare the `\n` here with the `\r\n` in `AccountEscapedTextDescriptionPlugin`: same shape of text,
 two registration routes, and the difference survives all the way into the file the tool
-writes. And compare `(order 1, disabled)` with `HalfFinished`'s: a step switched off by a
+writes. And compare `(order 1, disabled)` with `ContactRenewalHalfFinishedPlugin`'s: a step switched off by a
 solution import and a step switched off on the record have to read identically.
 
 ## Cases that need more than one assembly
@@ -882,19 +894,21 @@ solution import and a step switched off on the record have to read identically.
 Both of these straddle the **Managed** switch, which is the interesting part: one half of
 each is in the default list and the other half arrived in a solution.
 
-### Shared.Twin - one file, two assemblies
+### AccountTwinSyncPlugin - one file, two assemblies
 
-`src\Shared\Twin.cs` is linked into both `TestPlugins` and `Contoso.Crm.Plugins`, so
-`Shared.Twin` is a type in both, and both register it with steps of their own. This is
+`src\Shared\Plugins\Accounts\AccountTwinSyncPlugin.cs` is linked into both
+`Fabrikam.Dynamics.Sales.Plugins` and `Contoso.Crm.CustomerService.Plugins`, so
+`Litware.Shared.Plugins.Accounts.AccountTwinSyncPlugin` is a type in both, and both register
+it with steps of their own. This is
 what a shared base library looks like once it has been deployed twice, and the tool
 knows nothing about assemblies when it goes looking for a file: both registrations resolve
 to this one `.cs`.
 
-With **Managed** off only TestPlugins' registration is in view, so the file is written
+With **Managed** off only Fabrikam's registration is in view, so the file is written
 once and a second run leaves it alone. Turn the switch on and the fight below starts.
 
 Both are written, in assembly order, and the second is what survives. Contoso's is written
-first, TestPlugins' second, so the file ends up saying:
+first, Fabrikam's second, so the file ends up saying:
 
 ```csharp
 [Plugin]
@@ -910,17 +924,18 @@ and the registration that is *not* in the file is Contoso's:
 [Step("Update", "account", "name", Stages.PreOperation, ExecutionMode.Synchronous, ExecutionOrder = 4)]
 ```
 
-The write report names `Twin` twice under "Updated", which is the only warning given.
+The write report names `AccountTwinSyncPlugin` twice under "Updated", which is the only warning given.
 Whether that is acceptable is a decision; that it happens is pinned here.
 
-### Rival - settled by namespace across assemblies
+### RivalDeleteGuardPlugin - settled by namespace across assemblies
 
-`TestPlugins.Rival` and `Contoso.Crm.Rival` are different classes, in different
-namespaces, in different assemblies, in a file each. The short name matches both files,
+`Fabrikam.Dynamics.Sales.Plugins.Activities.Tasks.Guards.RivalDeleteGuardPlugin` and
+`Contoso.Crm.CustomerService.Plugins.Contacts.Guards.RivalDeleteGuardPlugin` are different
+classes, in different namespaces, in different assemblies, in a file each. The short name matches both files,
 and the registered namespace settles which is which: each registration is written into
 its own file, never the other's.
 
-`TestPlugins\Plugins\Rival.cs`:
+`Fabrikam.Dynamics.Sales.Plugins\Activities\Tasks\Guards\RivalDeleteGuardPlugin.cs`:
 
 ```csharp
 [Plugin]
@@ -930,7 +945,7 @@ its own file, never the other's.
 /// Sync Pre-Delete of task (order 1)
 ```
 
-`ContosoPlugins\Rival.cs`, behind the **Managed** switch:
+`Contoso.Crm.CustomerService.Plugins\Contacts\Guards\RivalDeleteGuardPlugin.cs`, behind the **Managed** switch:
 
 ```csharp
 [Plugin]
@@ -940,29 +955,30 @@ its own file, never the other's.
 /// Sync Pre-Delete of contact (order 1)
 ```
 
-With **Managed** off only `TestPlugins.Rival` is in view, and the tie resolves exactly the
+With **Managed** off only Fabrikam's `RivalDeleteGuardPlugin` is in view, and the tie resolves exactly the
 same way: the namespace is read from the registration and the files, not from which
 assemblies happen to be ticked, so hiding half the registrations changes what is written
 but never where.
 
-Alpha.Duplicate is the same tie inside one assembly; Rival is the same tie across two.
+`NoteCreateDuplicatePlugin` is the same tie inside one assembly; `RivalDeleteGuardPlugin` is the same tie across two.
 
-## Contoso.Crm.Orphan - registered, no source
+## Contoso.Crm.CustomerService.Orphan.Plugins - registered, no source
 
-`Contoso.Crm.Bravo` and `Contoso.Crm.Ghost` have steps and no `.cs` under `tests\src`.
+`BravoFollowUpTaskPlugin` and `GhostTaskImpersonatedUpdatePlugin` have steps and no `.cs`
+under `tests\src`.
 They appear in the class list, they appear in the preview with their attributes rendered,
 and the write report puts both under:
 
 ```
 // No matching .cs file (2)
-//   Bravo
-//   Ghost
+//   BravoFollowUpTaskPlugin
+//   GhostTaskImpersonatedUpdatePlugin
 ```
 
 The preview showing them is deliberate: nothing has failed until you press Write.
 
-`Ghost` is also where impersonation is pinned on the managed route — the solution carries
-a user's full name and the importer resolves it, where `TestPlugins.DisabledAndImpersonated`
+`GhostTaskImpersonatedUpdatePlugin` is also where impersonation is pinned on the managed route — the solution carries
+a user's full name and the importer resolves it, where `TaskDisabledAndImpersonatedPlugin`
 gets there by id over the Web API. Both come out saying the same thing, and `As <name>` is
 whoever ran `register.ps1`:
 
@@ -975,18 +991,18 @@ whoever ran `register.ps1`:
 ```
 
 In attribute mode the impersonation is gone, because no attribute can carry it — the same
-suppression `DisabledAndImpersonated` pins, here on a class with no file to write to.
+suppression `TaskDisabledAndImpersonatedPlugin` pins, here on a class with no file to write to.
 
-## Contoso.Crm.Empty - registered, no steps
+## Contoso.Crm.CustomerService.Empty.Plugins - registered, no steps
 
-`Contoso.Crm.Empty.Idle` and `Contoso.Crm.Empty.Spare` are plugin types with no steps in
+`IdleQueueMonitorPlugin` and `SpareCapacityReservePlugin` are plugin types with no steps in
 an assembly where nothing else has any either. Ticking the assembly must add no group, no
 classes and no preview - and must still say so, on the status line, as `· 1 with no steps`.
 
 Unticking and re-ticking it must not send another query: an assembly that turned out to
 have nothing is remembered as having been asked.
 
-## Microsoft.Contoso.Extensions - named Microsoft, signed by Contoso, shipped by Comentality
+## Microsoft.Contoso.Crm.Extensions.Plugins - named Microsoft, signed by Contoso, shipped by Comentality
 
 Hidden until the Microsoft switch is on - **whatever the Managed switch is set to**, which
 is the disjointness the two switches depend on - and once it is on, entirely ordinary:
@@ -1004,14 +1020,14 @@ faked, because the import validates the strong name and nobody outside Microsoft
 with those. That branch of `IsMicrosoft` can only be judged against whatever first party
 assemblies the environment really has, which is what the count on the switch is for.
 
-## WorkInProgress.Plugins - the second assembly registered by hand
+## Fabrikam.Dynamics.Subscriptions.Plugins - the second assembly registered by hand
 
-In the default list beside `TestPlugins`, and there to make sure the default list is a
+In the default list beside `Fabrikam.Dynamics.Sales.Plugins`, and there to make sure the default list is a
 list rather than a row: two groups in the class list, two `// =====` headings in the
 preview, and an "All" box that means both. Its classes read like a feature somebody is
 halfway through, which is the situation the whole tool is for.
 
-### NewFeature
+### AccountSubscriptionNewFeaturePlugin
 
 Everything at its default, on the route the tool is really used through.
 
@@ -1023,12 +1039,12 @@ Everything at its default, on the route the tool is really used through.
 /// Sync Post-Create of account (order 1): (all columns)
 ```
 
-### HalfFinished
+### ContactRenewalHalfFinishedPlugin
 
 Filtered and switched off, which is the resting state of half the steps in any
 development environment. `disabled` here comes off `statecode` on the step itself rather
 than off which solution imported it, and has to read identically to
-`DisabledAndImpersonated`'s.
+`TaskDisabledAndImpersonatedPlugin`'s.
 
 ```csharp
 [Plugin(Description = "Not finished, and switched off until it is.")]
@@ -1038,7 +1054,7 @@ than off which solution imported it, and has to read identically to
 /// Sync Pre-Update of contact (order 1, disabled): firstname
 ```
 
-### Scratch
+### TaskDeleteScratchCleanupPlugin
 
 A step whose name a person typed, sitting beside two in the same assembly that kept the
 name the registration tool offered - so `Name` is emitted here and suppressed there,
@@ -1059,15 +1075,15 @@ against a default string produced the same way a user's is. Its pre image is on 
 
 ## In the codebase, never registered
 
-Two classes in `src\ContosoPlugins` are compiled into `Contoso.Crm.Plugins` and are not
+Two classes in `src\Contoso.Crm.CustomerService.Plugins` are compiled into that assembly and are not
 registered as plugin types at all:
 
 | File | What it holds | What must happen |
 |---|---|---|
-| `StaleDoc.cs` | `[Plugin]`, `[Step]`, `[Image]` and a `Register:` block from a registration that has since been deleted | nothing. The class never reaches the list, so its stale documentation stays exactly as stale as it was found |
-| `Untouched.cs` | an ordinary undocumented class | nothing |
+| `Leads\Qualification\LeadCreateStaleDocsPlugin.cs` | `[Plugin]`, `[Step]`, `[Image]` and a `Register:` block from a registration that has since been deleted | nothing. The class never reaches the list, so its stale documentation stays exactly as stale as it was found |
+| `Cases\Routing\CaseRoutingUntouchedPlugin.cs` | an ordinary undocumented class | nothing |
 
-Both files have to come back from a run byte for byte identical. `StaleDoc` is the more
+Both files have to come back from a run byte for byte identical. `LeadCreateStaleDocsPlugin` is the more
 interesting of the two: the tool never removes documentation for a registration that has
 gone away, and a run over a folder full of other people's classes is the moment that would
 matter. It is pinned here as behaviour, not endorsed as correct.
@@ -1077,12 +1093,12 @@ matter. It is pinned here as behaviour, not endorsed as correct.
 Two reports are worth having, because the tool has two states worth being in.
 
 **The default list**, both switches off, both assemblies ticked, source folder `tests\src`
-- seventeen classes, every one resolving to a file — `Duplicate` and `Rival` match two
+- seventeen classes, every one resolving to a file — `NoteCreateDuplicatePlugin` and `RivalDeleteGuardPlugin` match two
 files each on the short name, and the registered namespace picks the right one:
 
 ```
 // Updated (17)
-//   ... every class with a file, Twin once
+//   ... every class with a file, AccountTwinSyncPlugin once
 ```
 
 Run it again and everything says `Already up to date (17)`. This is the run that settles,
@@ -1093,23 +1109,23 @@ classes are accounted for and pressing Write should produce a report of the shap
 
 ```
 // Updated (22)
-//   ... every class with a file, Twin twice
+//   ... every class with a file, AccountTwinSyncPlugin twice
 // No matching .cs file (2)
-//   Bravo
-//   Ghost
+//   BravoFollowUpTaskPlugin
+//   GhostTaskImpersonatedUpdatePlugin
 ```
 
-Twenty two writes over twenty one files, because `Twin` is written once per assembly. Run
+Twenty two writes over twenty one files, because `AccountTwinSyncPlugin` is written once per assembly. Run
 it a second time without changing anything and it becomes:
 
 ```
 // Updated (2)
-//   Twin
-//   Twin
+//   AccountTwinSyncPlugin
+//   AccountTwinSyncPlugin
 // Already up to date (20)
 ```
 
-`Twin` is the one thing that cannot settle: the two registrations overwrite each other on
+`AccountTwinSyncPlugin` is the one thing that cannot settle: the two registrations overwrite each other on
 every run, for ever - but only while both are in view, which is the difference between
 this report and the one above.
 
@@ -1133,7 +1149,7 @@ Worth knowing what the suite does *not* pin, so a gap is not mistaken for a pass
 - **An unmanaged assembly that is also named Microsoft.** `IsMicrosoft` is asked before
   `IsManaged`, so such a row would be held back by the Microsoft switch and not appear in
   the default list. The managed half of that ordering is pinned by
-  `Microsoft.Contoso.Extensions`; the unmanaged half is not, and adding a seventh assembly
+  `Microsoft.Contoso.Crm.Extensions.Plugins`; the unmanaged half is not, and adding a seventh assembly
   to say the same thing twice did not seem worth it.
 - **A managed assembly of your own that you still want to document.** The switch exists
   for it and the Contoso assemblies exercise the path, but "the environment you can reach
@@ -1163,7 +1179,7 @@ Things that cost time, in case they cost it again:
 - `sdkmessagefilter.primaryobjecttypecode` is an integer to a FetchXML condition and pac
   renders it as the table's *display* name, so `annotation` prints as `Note`. `verify.ps1`
   resolves object type codes up front and filters on those.
-- A plugin type name is only unique within its assembly. `Shared.Twin` exists in two, so
+- A plugin type name is only unique within its assembly. `AccountTwinSyncPlugin` exists in two, so
   every query in `verify.ps1` that names a type also names the assembly it belongs to; one
   that did not would pass against the wrong record.
 - Assembly metadata is generated from the matrix rather than committed, and the public key
@@ -1172,7 +1188,7 @@ Things that cost time, in case they cost it again:
   wrong token fails the import in the same way everything else does.
 - XML normalises line endings inside an element, so a description that goes into a
   solution as CRLF comes back as LF. The Web API keeps what it was given.
-  `Contoso.Crm.Charlie` and `TestPlugins.EscapedText` are the two halves of that, and it
+  `CharlieContactJobTitlePlugin` and `AccountEscapedTextDescriptionPlugin` are the two halves of that, and it
   is visible in the emitted attribute rather than only in the environment.
 - A step in a solution can run against a plugin type a *different* solution installed: the
   companion is packed with no assemblies at all, only root components of type 92, and the

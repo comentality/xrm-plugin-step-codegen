@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Registered in the environment, absent from the folder the tool is pointed at.
+
+    An assembly has to be a real signed DLL before Dataverse will take it, so the source
+    exists - it just lives under tests\nosource instead of tests\src, which is the folder
+    the tool searches. Every class in here has steps and no file, so every one of them
+    lands under "No matching .cs file".
+  -->
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AssemblyName>Contoso.Crm.CustomerService.Orphan.Plugins</AssemblyName>
+    <RootNamespace>Contoso.Crm.CustomerService.Plugins</RootNamespace>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\keys\Contoso.snk</AssemblyOriginatorKeyFile>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.*" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>
