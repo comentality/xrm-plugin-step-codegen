@@ -203,7 +203,12 @@ namespace PluginStepCodegen
         private int? _leftPin;
         private int? _sourcePin;
 
-        private bool _fitPending;
+        /// <summary>
+        /// A load lands in pieces - the assemblies, their classes, the scan - and each piece can
+        /// move a splitter, which reflows the toolbars and everything right of it. The fit waits
+        /// for the run to end the way the preview does, so a burst moves them once.
+        /// </summary>
+        private Timer _fitSettled;
 
         /// <summary>
         /// What each list held when it was last measured. Most fits follow a render that put the
@@ -454,6 +459,13 @@ namespace PluginStepCodegen
             {
                 _previewSettled.Stop();
                 RenderPreview();
+            };
+
+            _fitSettled = new Timer { Interval = 120 };
+            _fitSettled.Tick += (s, e) =>
+            {
+                _fitSettled.Stop();
+                FitPanes();
             };
 
             _memorySettled = new Timer { Interval = 120 };
@@ -840,6 +852,7 @@ namespace PluginStepCodegen
                 if (_checkSettled != null) _checkSettled.Dispose();
                 if (_previewSettled != null) _previewSettled.Dispose();
                 if (_memorySettled != null) _memorySettled.Dispose();
+                if (_fitSettled != null) _fitSettled.Dispose();
                 if (_scanSettled != null) _scanSettled.Dispose();
                 // A scan in flight checks the generation on arrival; bumping it here is what
                 // turns "the control is going away" into "that result is nobody's".
@@ -1118,19 +1131,15 @@ namespace PluginStepCodegen
         }
 
         /// <summary>
-        /// Refits the panes once the current message is done with. One tick re-renders the lists
-        /// and the preview in turn, and each asks; measuring three lists once is plenty.
+        /// Refits the panes once whatever is changing has stopped. One tick re-renders the lists
+        /// and the preview in turn, and each asks; fitting once is plenty.
         /// </summary>
         private void RequestFit()
         {
-            if (_fitPending || !_splittersLaid || !IsHandleCreated || IsDisposed) return;
+            if (!_splittersLaid || IsDisposed) return;
 
-            _fitPending = true;
-            BeginInvoke((Action)(() =>
-            {
-                _fitPending = false;
-                if (!IsDisposed) FitPanes();
-            }));
+            _fitSettled.Stop();
+            _fitSettled.Start();
         }
 
         /// <summary>
