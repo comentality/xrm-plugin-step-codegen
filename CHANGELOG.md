@@ -18,6 +18,16 @@
 
   ![An assembly with a step being profiled](assets/changelog-profiled-mark.png)
 
+- **Panes and columns now fit what they hold, so long assembly names and deep source paths get the room.**
+  Every column used to take a fixed share of its list and every pane a fixed width, so a
+  path three folders deep ended in an ellipsis beside a half-empty Steps column. Now the
+  short columns are exactly as wide as their widest entry, the assembly, class and path
+  columns take what is left, and the panes follow: the preview keeps its longest line (or a
+  third of the window when that is more), and the assembly and source panes share the rest.
+  The fit is redone whenever the lists or the preview change. Dragging a splitter or a column
+  divider stops at the widest line; a pane you drag narrower stays that way until you drag it
+  back out.
+
 - `tests\profile.ps1` profiles every step of the end to end fixture with the Plugin
   Registration Tool's own profiler library, reads the fixture before, during and after, and
   fails unless all three readings are identical down to every emitted line.
