@@ -24,5 +24,15 @@
     <EmbeddedResource Include="..\assets\XrmToolsMetaAttributes.cs">
       <LogicalName>PluginStepCodegen.XrmToolsMetaAttributes.cs</LogicalName>
     </EmbeddedResource>
+    <!-- The organisation's mark on the About button. The About folder is shared verbatim with
+         the other Comentality tools: fix it in xrm-icons and copy it across. -->
+    <EmbeddedResource Include="About\comentality-16.png">
+      <LogicalName>PluginStepCodegen.About.comentality-16.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The harness opens the About box without a modal loop, to photograph it. -->
+    <InternalsVisibleTo Include="PluginStepCodegen.UiHarness" />
   </ItemGroup>
 </Project>

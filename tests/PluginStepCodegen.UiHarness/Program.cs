@@ -92,6 +92,30 @@ namespace PluginStepCodegen.UiHarness
 
                     try { Capture.Of(form, outPath); }
                     catch (Exception ex) { failures.Add(ex.ToString()); }
+
+                    // Its own window, so its own shot. The box is opened without a modal loop,
+                    // which is what the internal constructor is for; the button is pressed for
+                    // real in the shipped tool, and here the claim being checked is what opens.
+                    if (Environment.GetEnvironmentVariable("UIHARNESS_ABOUT") == "1")
+                    {
+                        try
+                        {
+                            var about = Comentality.Xtb.About.ToolAbout.FromPlugin(typeof(PluginStepCodegenPlugin),
+                                "plugin-step-codegen", "https://github.com/comentality/xrm-plugin-step-codegen");
+                            using (var box = new Comentality.Xtb.About.AboutBox(about))
+                            {
+                                box.StartPosition = FormStartPosition.Manual;
+                                box.Location = form.Location;
+                                box.Show();
+                                Settle();
+                                Capture.Of(box, outPath + ".about.png");
+                                File.WriteAllText(outPath + ".about.txt", about.Version + "\r\n" + about.PageUrl
+                                    + "\r\n" + about.ReleaseNotesUrl + "\r\n" + about.Diagnostics() + "\r\n" + about.MailTo());
+                            }
+                        }
+                        catch (Exception ex) { failures.Add(ex.ToString()); }
+                    }
+
                     form.Close();
                 };
                 settle.Start();

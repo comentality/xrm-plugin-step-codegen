@@ -7,15 +7,17 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Comentality.Xtb.About;
 using Microsoft.Xrm.Sdk;
 using McTools.Xrm.Connection;
 using PluginStepCodegen.Logic;
 using XrmToolBox.Extensibility;
+using XrmToolBox.Extensibility.Interfaces;
 using Label = System.Windows.Forms.Label;
 
 namespace PluginStepCodegen
 {
-    public partial class PluginStepCodegenControl : PluginControlBase
+    public partial class PluginStepCodegenControl : PluginControlBase, IAboutPlugin
     {
         private List<AssemblyInfo> _assemblies = new List<AssemblyInfo>();
 
@@ -127,6 +129,9 @@ namespace PluginStepCodegen
         private ExperimentalSettings _experimental = new ExperimentalSettings();
         private Button _btnExperimental;
         private ContextMenuStrip _experimentalMenu;
+        private Button _btnAbout;
+        private Image _houseMark;
+        private ToolTip _aboutTip;
 
         private SplitContainer _mainSplit;
         private SplitContainer _leftSplit;
@@ -635,8 +640,8 @@ namespace PluginStepCodegen
             _rbComment = new RadioButton { Text = "Readable summary comment", AutoSize = true, Margin = new Padding(0) };
 
             // Puts the code view away and hands its width to the source column, for the sessions
-            // that are about auditing the marks rather than reading what would be written. At the
-            // toolbar's right edge, against the pane it toggles.
+            // that are about auditing the marks rather than reading what would be written. In the
+            // toolbar's right corner, above the pane it toggles.
             // No Anchor on either button: inside the flow row an anchor across the flow
             // direction makes the layout wrap, and the row itself is what hugs the right edge.
             _btnPreviewToggle = new Button
@@ -701,9 +706,27 @@ namespace PluginStepCodegen
             _experimentalMenu.Items.Add(miAllColumnsExcept);
             _btnExperimental.Click += (s, e) => _experimentalMenu.Show(_btnExperimental, new Point(0, _btnExperimental.Height));
 
+            // The one button here that is about who made the tool rather than about the classes
+            // in it, and the mark says so before the word is read, so it is the organisation's
+            // mark and not this tool's. The same word in the same corner in every Comentality tool.
+            _houseMark = HouseMark();
+            _btnAbout = new Button
+            {
+                Text = "About",
+                Image = _houseMark,
+                ImageAlign = ContentAlignment.MiddleLeft,
+                TextImageRelation = TextImageRelation.ImageBeforeText,
+                Width = 74,
+                Height = 24,
+                Margin = new Padding(6, 0, 0, 4)
+            };
+            _btnAbout.Click += (s, e) => ShowAboutDialog();
+            _aboutTip = new ToolTip();
+            _aboutTip.SetToolTip(_btnAbout, "What this is, which build you have, and where to say it is wrong.");
+
             var modeRow = Row(_rbAttributes, _rbComment);
             modeRow.Margin = new Padding(0, 0, 0, 4);
-            var cornerRow = Row(_btnExperimental, _btnPreviewToggle);
+            var cornerRow = Row(_btnExperimental, _btnPreviewToggle, _btnAbout);
             cornerRow.Dock = DockStyle.None;
             cornerRow.Anchor = AnchorStyles.Right;
             cornerRow.WrapContents = false;
@@ -808,6 +831,32 @@ namespace PluginStepCodegen
         }
 
         /// <summary>
+        /// The box the About button opens, and what XrmToolBox calls from its own menu. Nothing
+        /// here is redistributed from anybody else, so the box has no licence notices to offer.
+        /// </summary>
+        public void ShowAboutDialog()
+        {
+            AboutBox.Show(this, ToolAbout.FromPlugin(typeof(PluginStepCodegenPlugin), "plugin-step-codegen",
+                "https://github.com/comentality/xrm-plugin-step-codegen"));
+        }
+
+        private static Image HouseMark()
+        {
+            // The stream behind an Image has to outlive it, so the bitmap is copied off it and
+            // the stream let go here rather than kept open for the life of the window.
+            using (var stream = typeof(PluginStepCodegenControl).Assembly
+                .GetManifestResourceStream("PluginStepCodegen.About.comentality-16.png"))
+            {
+                if (stream == null) return null;
+
+                using (var loaded = new Bitmap(stream))
+                {
+                    return new Bitmap(loaded);
+                }
+            }
+        }
+
+        /// <summary>
         /// A grouped ListView repainted straight to the screen drops rows after a large resize -
         /// which is exactly what collapsing the output pane is. Double buffering is the standard
         /// cure, and the property is non-public for no reason anybody remembers.
@@ -868,6 +917,8 @@ namespace PluginStepCodegen
                 _codeFont.Dispose();
                 if (_newMark != null) _newMark.Dispose();
                 if (_profiledMark != null) _profiledMark.Dispose();
+                if (_houseMark != null) _houseMark.Dispose();
+                if (_aboutTip != null) _aboutTip.Dispose();
                 _daggerFont.Dispose();
                 // A ContextMenuStrip belongs to no Controls collection, so nothing else frees it.
                 if (_experimentalMenu != null) _experimentalMenu.Dispose();
@@ -935,6 +986,9 @@ namespace PluginStepCodegen
         /// <summary>Below this the first column's text is all ellipsis, so the list scrolls instead.</summary>
         private const int FirstColumnFloor = 60;
 
+        /// <summary>What the columns leave unused at the end of a list.</summary>
+        private const int ColumnSlack = 4;
+
         /// <summary>
         /// A list's border, and its vertical scrollbar whether it is showing yet or not: reserved
         /// up front, the scrollbar arriving with the twentieth row does not push a path into an
@@ -942,7 +996,7 @@ namespace PluginStepCodegen
         /// </summary>
         private static int ListChrome
         {
-            get { return 4 + SystemInformation.VerticalScrollBarWidth; }
+            get { return 4 + ColumnSlack + SystemInformation.VerticalScrollBarWidth; }
         }
 
         /// <summary>
@@ -962,7 +1016,17 @@ namespace PluginStepCodegen
         /// </summary>
         private void HugContent(ListView list)
         {
-            list.ClientSizeChanged += (s, e) => SpreadColumns(list);
+            // After the resize rather than inside it: a list without groups settles its scrollbar
+            // once its own resize is done, from the columns it had going in, and a sideways
+            // scrollbar is left showing beside columns that fit.
+            list.ClientSizeChanged += (s, e) =>
+            {
+                if (!list.IsHandleCreated) return;
+                list.BeginInvoke((Action)(() =>
+                {
+                    if (!list.IsDisposed) SpreadColumns(list);
+                }));
+            };
             list.ColumnWidthChanging += (s, e) =>
             {
                 int[] naturals;
@@ -1096,7 +1160,7 @@ namespace PluginStepCodegen
                 rest += naturals[i];
             }
 
-            var first = Math.Min(naturals[0], Math.Max(list.ClientSize.Width - rest, FirstColumnFloor));
+            var first =Math.Min(naturals[0], Math.Max(list.ClientSize.Width - ColumnSlack - rest, FirstColumnFloor));
 
             // Already laid out like this: setting the same widths again still repaints the list.
             var same = list.Columns[0].Width == first;
