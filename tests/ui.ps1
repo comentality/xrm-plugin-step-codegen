@@ -52,8 +52,8 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 # Each shot is width, height, output path, and then what makes it different from the last one.
 $shots = if ($Docs) {
     @(
-        @{ Size = "1280x860"; Name = "ui-attributes.png"; Mode = "attributes"; Folder = $docsFolder; Title = "Plugin Step Codegen" }
-        @{ Size = "1280x860"; Name = "ui-comment.png";    Mode = "comment";    Folder = $docsFolder; Title = "Plugin Step Codegen" }
+        @{ Size = "1600x900"; Name = "ui-attributes.png"; Mode = "attributes"; Folder = $docsFolder; Title = "Plugin Step Codegen" }
+        @{ Size = "1600x900"; Name = "ui-comment.png";    Mode = "comment";    Folder = $docsFolder; Title = "Plugin Step Codegen" }
     )
 } else {
     @($Size | ForEach-Object { @{ Size = $_; Name = $null; Mode = "attributes"; Folder = $null; Title = $null } })
