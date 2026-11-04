@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>Comentality.PluginStepCodegen</id>
-    <version>1.4.1-dev</version>
+    <version>1.4.1</version>
     <title>Plugin Step Codegen</title>
     <authors>Comentality</authors>
     <license type="expression">MIT</license>
@@ -11,11 +11,15 @@
     <icon>icon.png</icon>
     <readme>docs\README.md</readme>
     <description>Document your registered plugin steps in your existing C# code, as Xrm Tools attributes or a summary comment. Reads the steps and images registered in a Dataverse environment and writes them into the plugin classes they run, so registration shows up in code review, diffs and git history.</description>
-    <releaseNotes>v1.4.0
+    <releaseNotes>v1.4.1
+- An About button says which build you have, where the tool lives, and how to tell us what is wrong.
+- The assembly list no longer shows a sideways scrollbar when its columns already fit the pane.
+Full changelog, with screenshots: https://github.com/comentality/xrm-plugin-step-codegen/releases/tag/v1.4.1
+
+v1.4.0
 - A step you are profiling is documented exactly as registered, not as a disabled step called "(Profiled)".
 - A class with a step being profiled wears a small amber bug, so a forgotten profiling session is hard to miss.
 - Panes and columns now fit what they hold, so long assembly names and deep source paths get the room.
-Full changelog, with screenshots: https://github.com/comentality/xrm-plugin-step-codegen/releases/tag/v1.4.0
 
 v1.3.0
 - The tool remembers what you ticked and where your source is, and marks whatever was not there last time.
