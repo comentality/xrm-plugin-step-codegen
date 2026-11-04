@@ -207,17 +207,32 @@ namespace Comentality.Xtb.About
 
             // The site reads as the address it is, because that is what somebody types into a
             // browser on the machine next to this one. The other two are named for what they do.
-            links.Controls.Add(Link(Bare(_about.PageUrl), _about.PageUrl));
+            var site = Link(Bare(_about.PageUrl), _about.PageUrl);
+            links.Controls.Add(site);
 
             if (_about.RepositoryUrl != null)
             {
-                links.Controls.Add(Dot());
+                // A long page name leaves no room beside it. The other two go down a line
+                // together, rather than the last one alone under a dot left at the end of the line.
+                if (LinksFitOnOneLine(width)) links.Controls.Add(Dot());
+                else links.SetFlowBreak(site, true);
+
                 links.Controls.Add(Link("What is new", _about.ReleaseNotesUrl));
                 links.Controls.Add(Dot());
                 links.Controls.Add(Link("Source", _about.RepositoryUrl));
             }
 
             return links;
+        }
+
+        private bool LinksFitOnOneLine(int width)
+        {
+            var dot = TextRenderer.MeasureText("·", Font).Width + 10;
+
+            return TextRenderer.MeasureText(Bare(_about.PageUrl), Font).Width
+                   + TextRenderer.MeasureText("What is new", Font).Width
+                   + TextRenderer.MeasureText("Source", Font).Width
+                   + dot * 2 <= width;
         }
 
         private Control BuildFeedback()
