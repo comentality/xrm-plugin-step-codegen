@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <AssemblyName>PluginStepCodegen</AssemblyName>
     <RootNamespace>PluginStepCodegen</RootNamespace>
-    <Version>1.4.1</Version>
+    <Version>1.4.2-dev</Version>
     <UseWindowsForms>true</UseWindowsForms>
     <Company>Comentality</Company>
     <Authors>Comentality</Authors>

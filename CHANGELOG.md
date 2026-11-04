@@ -1,5 +1,7 @@
 ﻿# Changelog
 
+## Unreleased
+
 ## 1.4.1
 
 - **An About button says which build you have, where the tool lives, and how to tell us what is wrong.**
