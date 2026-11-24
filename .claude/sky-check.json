@@ -1,4 +1,0 @@
-{
-  "command": "dotnet build PluginStepCodegen/PluginStepCodegen.csproj -v q -nologo",
-  "timeoutSeconds": 120
-}
